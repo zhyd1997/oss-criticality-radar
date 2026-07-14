@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from "next/server";
-import { GitHubError } from "@/lib/github";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { ScoreServiceError } from "@/lib/score-service-client";
 import { scoreRepoUrl } from "@/lib/score";
@@ -24,14 +23,6 @@ function errorResponse(err: unknown): NextResponse {
         error: err.message,
         code: err.code ?? "score_service_error",
       },
-      { status },
-    );
-  }
-  if (err instanceof GitHubError) {
-    const status =
-      err.status >= 400 && err.status < 600 ? err.status : 502;
-    return NextResponse.json(
-      { error: err.message, code: "github_error" },
       { status },
     );
   }

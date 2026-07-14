@@ -27,19 +27,20 @@ export class ScoreServiceError extends Error {
   }
 }
 
-function serviceBaseUrl(): string | null {
+function serviceBaseUrl(): string {
   const url = process.env.SCORE_SERVICE_URL?.trim();
-  return url ? url.replace(/\/$/, "") : null;
+  if (!url) {
+    throw new ScoreServiceError(
+      "SCORE_SERVICE_URL is required. Start score-service and set SCORE_SERVICE_URL (e.g. http://localhost:8080).",
+      { status: 500, code: "score_service_unconfigured" },
+    );
+  }
+  return url.replace(/\/$/, "");
 }
 
 function serviceToken(): string | undefined {
   const t = process.env.SCORE_SERVICE_TOKEN?.trim();
   return t || undefined;
-}
-
-/** True when the Next BFF should call the Dockerized score-service. */
-export function isScoreServiceConfigured(): boolean {
-  return serviceBaseUrl() !== null;
 }
 
 /**
@@ -48,12 +49,6 @@ export function isScoreServiceConfigured(): boolean {
  */
 export async function scoreViaService(repoUrl: string): Promise<ScoreResult> {
   const base = serviceBaseUrl();
-  if (!base) {
-    throw new ScoreServiceError("SCORE_SERVICE_URL is not configured", {
-      status: 500,
-      code: "score_service_unconfigured",
-    });
-  }
 
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
