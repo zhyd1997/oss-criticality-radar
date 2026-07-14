@@ -82,11 +82,11 @@ export function ScoreForm() {
       <form onSubmit={onSubmit} className="flex w-full flex-col gap-3">
         <label
           htmlFor="repo-url"
-          className="text-sm font-medium text-zinc-600 dark:text-zinc-400"
+          className="text-sm text-zinc-600 dark:text-zinc-400"
         >
           GitHub repository URL
         </label>
-        <div className="flex flex-col gap-3 sm:flex-row">
+        <div className="flex flex-col gap-2 sm:flex-row">
           <input
             id="repo-url"
             type="text"
@@ -96,25 +96,18 @@ export function ScoreForm() {
             disabled={loading}
             autoComplete="off"
             spellCheck={false}
-            className="min-w-0 flex-1 rounded-xl border border-zinc-200 bg-white px-4 py-3 text-base text-zinc-900 shadow-sm outline-none transition placeholder:text-zinc-400 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 disabled:opacity-60 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-50 dark:placeholder:text-zinc-500 dark:focus:border-emerald-400"
+            className="min-w-0 flex-1 rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 outline-none focus:border-zinc-500 disabled:opacity-60 dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-50 dark:focus:border-zinc-500"
           />
           <button
             type="submit"
             disabled={loading}
-            className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl bg-emerald-600 px-6 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-emerald-500 dark:hover:bg-emerald-400"
+            className="inline-flex shrink-0 items-center justify-center rounded-md border border-zinc-900 bg-zinc-900 px-4 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-60 dark:border-zinc-100 dark:bg-zinc-100 dark:text-zinc-900"
           >
-            {loading ? (
-              <>
-                <Spinner />
-                Analyzing…
-              </>
-            ) : (
-              "Get criticality score"
-            )}
+            Get score
           </button>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2 text-xs text-zinc-500 dark:text-zinc-400">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-zinc-500">
           <span>Try:</span>
           {EXAMPLES.map((example) => (
             <button
@@ -125,7 +118,7 @@ export function ScoreForm() {
                 setUrl(example);
                 void analyze(example);
               }}
-              className="rounded-full border border-zinc-200 bg-zinc-50 px-2.5 py-1 transition hover:border-emerald-300 hover:bg-emerald-50 hover:text-emerald-800 disabled:opacity-50 dark:border-zinc-700 dark:bg-zinc-800/60 dark:hover:border-emerald-700 dark:hover:bg-emerald-950 dark:hover:text-emerald-300"
+              className="underline underline-offset-2 hover:text-zinc-800 disabled:opacity-50 dark:hover:text-zinc-200"
             >
               {example.replace("https://github.com/", "")}
             </button>
@@ -134,55 +127,21 @@ export function ScoreForm() {
       </form>
 
       {state.status === "error" && (
-        <div
+        <p
           role="alert"
-          className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800 dark:border-red-900/50 dark:bg-red-950/40 dark:text-red-200"
+          className="border-l-2 border-zinc-900 pl-3 text-sm font-medium text-zinc-900 dark:border-zinc-100 dark:text-zinc-50"
         >
           {state.message}
-        </div>
+        </p>
       )}
 
       {loading && (
-        <div className="rounded-2xl border border-zinc-200 bg-white/60 p-8 text-center dark:border-zinc-800 dark:bg-zinc-900/40">
-          <div className="mx-auto mb-3 flex h-10 w-10 items-center justify-center">
-            <Spinner className="h-8 w-8 text-emerald-600" />
-          </div>
-          <p className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
-            Collecting signals from GitHub…
-          </p>
-          <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
-            This may take 10–30 seconds depending on the repository size.
-          </p>
-        </div>
+        <p className="text-sm text-zinc-500">
+          Collecting signals from GitHub… this may take 10–30 seconds.
+        </p>
       )}
 
       {state.status === "success" && <ScoreResultView result={state.result} />}
     </div>
-  );
-}
-
-function Spinner({ className = "h-4 w-4" }: { className?: string }) {
-  return (
-    <svg
-      className={`animate-spin ${className}`}
-      xmlns="http://www.w3.org/2000/svg"
-      fill="none"
-      viewBox="0 0 24 24"
-      aria-hidden
-    >
-      <circle
-        className="opacity-25"
-        cx="12"
-        cy="12"
-        r="10"
-        stroke="currentColor"
-        strokeWidth="4"
-      />
-      <path
-        className="opacity-75"
-        fill="currentColor"
-        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-      />
-    </svg>
   );
 }
