@@ -24,6 +24,10 @@ export type RepoMeta = {
   license: string | null;
   stars: number;
   description: string | null;
+  /** ISO timestamp when the repository was created. */
+  createdAt: string;
+  /** ISO timestamp of the latest commit on the default branch. */
+  updatedAt: string;
 };
 
 export type SignalContribution = {

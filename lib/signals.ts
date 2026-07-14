@@ -176,6 +176,8 @@ export async function collectSignals(
     license: repo.licenseInfo?.name ?? null,
     stars: repo.stargazerCount,
     description: repo.description,
+    createdAt: repo.createdAt,
+    updatedAt: lastCommitDate.toISOString(),
   };
 
   return { repo: meta, signals };

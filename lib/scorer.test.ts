@@ -67,6 +67,8 @@ describe("scoreSignals", () => {
         license: null,
         stars: 0,
         description: null,
+        createdAt: "2021-12-20T02:15:12.000Z",
+        updatedAt: "2026-07-07T22:16:34.000Z",
       },
       { ...fullSignals, github_mention_count: null },
     );
