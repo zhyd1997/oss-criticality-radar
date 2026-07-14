@@ -1,16 +1,22 @@
 import { ScoreForm } from "./components/ScoreForm";
+import { ThemeToggle } from "./components/ThemeToggle";
 
 export default function Home() {
   return (
     <main className="mx-auto flex w-full max-w-3xl flex-1 flex-col px-4 py-12 sm:px-6 sm:py-16">
       <header className="mb-10">
-        <h1 className="text-2xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-50">
-          OSS Criticality Radar
-        </h1>
-        <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
-          OpenSSF criticality score for any GitHub repository (0 = least
-          critical, 1 = most critical).
-        </p>
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h1 className="text-2xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-50">
+              OSS Criticality Radar
+            </h1>
+            <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
+              OpenSSF criticality score for any GitHub repository (0 = least
+              critical, 1 = most critical).
+            </p>
+          </div>
+          <ThemeToggle />
+        </div>
       </header>
 
       <ScoreForm />
