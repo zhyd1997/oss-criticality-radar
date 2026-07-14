@@ -331,7 +331,7 @@ async function fetchOrgCount(
 function normalizeCompany(company: string): string {
   return company
     .toLowerCase()
-    .replace(/inc\./g, "")
+    .replace(/inc\.?/g, "")
     .replace(/llc/g, "")
     .replace(/@/g, "")
     .replace(/ /g, "")

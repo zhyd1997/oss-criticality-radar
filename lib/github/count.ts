@@ -37,7 +37,8 @@ function isOverflowError(err: unknown): boolean {
 
 function isEmptyError(err: unknown): boolean {
   return (
-    err instanceof GitHubError && (err.status === 204 || err.status === 404)
+    err instanceof GitHubError &&
+    (err.status === 204 || err.status === 404 || err.status === 410)
   );
 }
 

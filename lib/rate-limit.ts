@@ -9,6 +9,7 @@ const buckets = new Map<string, Bucket>();
 
 const WINDOW_MS = 60_000;
 const MAX_REQUESTS = 10;
+const MAX_BUCKETS = 10_000;
 
 export type RateLimitResult =
   | { ok: true }
@@ -18,6 +19,12 @@ export function checkRateLimit(key: string): RateLimitResult {
   const now = Date.now();
   let bucket = buckets.get(key);
   if (!bucket) {
+    if (buckets.size >= MAX_BUCKETS) {
+      const oldestKey = buckets.keys().next().value;
+      if (oldestKey !== undefined) {
+        buckets.delete(oldestKey);
+      }
+    }
     bucket = { timestamps: [] };
     buckets.set(key, bucket);
   }
@@ -42,6 +49,7 @@ type CacheEntry = { expiresAt: number; payload: unknown };
 
 const scoreCache = new Map<string, CacheEntry>();
 const CACHE_TTL_MS = 15 * 60_000;
+const MAX_CACHE_ENTRIES = 10_000;
 
 export function getCachedScore<T>(owner: string, name: string): T | null {
   const key = `${owner.toLowerCase()}/${name.toLowerCase()}`;
@@ -60,5 +68,11 @@ export function setCachedScore(
   payload: unknown,
 ): void {
   const key = `${owner.toLowerCase()}/${name.toLowerCase()}`;
+  if (!scoreCache.has(key) && scoreCache.size >= MAX_CACHE_ENTRIES) {
+    const oldestKey = scoreCache.keys().next().value;
+    if (oldestKey !== undefined) {
+      scoreCache.delete(oldestKey);
+    }
+  }
   scoreCache.set(key, { expiresAt: Date.now() + CACHE_TTL_MS, payload });
 }

@@ -1,5 +1,6 @@
 const GITHUB_API = "https://api.github.com";
 const GITHUB_GRAPHQL = "https://api.github.com/graphql";
+const REQUEST_TIMEOUT_MS = 10_000;
 
 export class GitHubError extends Error {
   readonly status: number;
@@ -54,75 +55,97 @@ export function createGitHubClient(token = readTokenFromEnv()): GitHubClient {
       path: string,
       init?: { headers?: Record<string, string> },
     ) {
-      const res = await fetch(`${GITHUB_API}${path}`, {
-        headers: { ...baseHeaders, ...init?.headers },
-        cache: "no-store",
-      });
+      const controller = new AbortController();
+      const timeoutId = setTimeout(
+        () => controller.abort(),
+        REQUEST_TIMEOUT_MS,
+      );
 
-      if (!res.ok) {
-        let detail = res.statusText;
-        try {
-          const body = (await res.json()) as { message?: string };
-          if (body.message) detail = body.message;
-        } catch {
-          // ignore parse errors
+      try {
+        const res = await fetch(`${GITHUB_API}${path}`, {
+          headers: { ...baseHeaders, ...init?.headers },
+          cache: "no-store",
+          signal: controller.signal,
+        });
+
+        if (!res.ok) {
+          let detail = res.statusText;
+          try {
+            const body = (await res.json()) as { message?: string };
+            if (body.message) detail = body.message;
+          } catch {
+            // ignore parse errors
+          }
+          throw new GitHubError(`GitHub API error: ${detail}`, res.status);
         }
-        throw new GitHubError(`GitHub API error: ${detail}`, res.status);
-      }
 
-      if (res.status === 204) {
-        return { data: null as T, headers: res.headers, status: res.status };
-      }
+        if (res.status === 204) {
+          return { data: null as T, headers: res.headers, status: res.status };
+        }
 
-      const data = (await res.json()) as T;
-      return { data, headers: res.headers, status: res.status };
+        const data = (await res.json()) as T;
+        return { data, headers: res.headers, status: res.status };
+      } finally {
+        clearTimeout(timeoutId);
+      }
     },
 
     async graphql<T>(
       query: string,
       variables: Record<string, unknown> = {},
     ) {
-      const res = await fetch(GITHUB_GRAPHQL, {
-        method: "POST",
-        headers: {
-          ...baseHeaders,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ query, variables }),
-        cache: "no-store",
-      });
+      const controller = new AbortController();
+      const timeoutId = setTimeout(
+        () => controller.abort(),
+        REQUEST_TIMEOUT_MS,
+      );
 
-      if (!res.ok) {
-        let detail = res.statusText;
-        try {
-          const body = (await res.json()) as { message?: string };
-          if (body.message) detail = body.message;
-        } catch {
-          // ignore
+      try {
+        const res = await fetch(GITHUB_GRAPHQL, {
+          method: "POST",
+          headers: {
+            ...baseHeaders,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ query, variables }),
+          cache: "no-store",
+          signal: controller.signal,
+        });
+
+        if (!res.ok) {
+          let detail = res.statusText;
+          try {
+            const body = (await res.json()) as { message?: string };
+            if (body.message) detail = body.message;
+          } catch {
+            // ignore
+          }
+          throw new GitHubError(`GitHub GraphQL error: ${detail}`, res.status);
         }
-        throw new GitHubError(`GitHub GraphQL error: ${detail}`, res.status);
+
+        const body = (await res.json()) as {
+          data?: T;
+          errors?: Array<{ message: string; type?: string }>;
+        };
+
+        if (body.errors?.length) {
+          const msg = body.errors.map((e) => e.message).join("; ");
+          const notFound = body.errors.some(
+            (e) =>
+              e.type === "NOT_FOUND" ||
+              e.message.toLowerCase().includes("could not resolve"),
+          );
+          throw new GitHubError(msg, notFound ? 404 : 400);
+        }
+
+        if (!body.data) {
+          throw new GitHubError("Empty GraphQL response", 500);
+        }
+
+        return body.data;
+      } finally {
+        clearTimeout(timeoutId);
       }
-
-      const body = (await res.json()) as {
-        data?: T;
-        errors?: Array<{ message: string; type?: string }>;
-      };
-
-      if (body.errors?.length) {
-        const msg = body.errors.map((e) => e.message).join("; ");
-        const notFound = body.errors.some(
-          (e) =>
-            e.type === "NOT_FOUND" ||
-            e.message.toLowerCase().includes("could not resolve"),
-        );
-        throw new GitHubError(msg, notFound ? 404 : 400);
-      }
-
-      if (!body.data) {
-        throw new GitHubError("Empty GraphQL response", 500);
-      }
-
-      return body.data;
     },
   };
 }
