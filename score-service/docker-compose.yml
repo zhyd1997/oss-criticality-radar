@@ -1,0 +1,19 @@
+services:
+  score-service:
+    build: .
+    # Bind to loopback only so an unauthenticated local process is not LAN-exposed.
+    # Production/non-local deploys should set SCORE_SERVICE_TOKEN (via env_file).
+    ports:
+      - "127.0.0.1:8080:8080"
+    # Inject secrets/config into the container from optional files.
+    # Do NOT re-list GITHUB_AUTH_TOKEN / SCORE_SERVICE_TOKEN under `environment`
+    # with ${VAR:-}: empty host interpolation overrides env_file with blanks.
+    env_file:
+      - path: ../.env.local
+        required: false
+      - path: .env
+        required: false
+    environment:
+      PORT: "8080"
+      # Only non-secret defaults here. Tokens come from env_file (or a real host export).
+      SCORE_MAX_CONCURRENCY: ${SCORE_MAX_CONCURRENCY:-2}

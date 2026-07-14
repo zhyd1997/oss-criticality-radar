@@ -1,27 +1,19 @@
-import { createGitHubClient } from "./github";
 import { parseGitHubRepo } from "./parse-repo";
-import {
-  getCachedScore,
-  setCachedScore,
-} from "./rate-limit";
-import { buildScoreResult } from "./scorer";
-import { collectSignals } from "./signals";
+import { getCachedScore, setCachedScore } from "./rate-limit";
+import { scoreViaService } from "./score-service-client";
 import type { ScoreResult } from "./types";
 
 /**
- * Parse a GitHub repo URL, collect signals, and compute the criticality score.
- * Shared by GET and POST handlers — no synthetic Request framing.
+ * Parse a GitHub repo URL and compute the criticality score via score-service
+ * (OpenSSF criticality_score CLI). Shared by GET and POST /api/score.
  */
 export async function scoreRepoUrl(url: string): Promise<ScoreResult> {
-  const { owner, name } = parseGitHubRepo(url);
+  const { owner, name, url: canonical } = parseGitHubRepo(url);
 
   const cached = getCachedScore<ScoreResult>(owner, name);
   if (cached) return cached;
 
-  const client = createGitHubClient();
-  const { repo, signals } = await collectSignals(owner, name, client);
-  const result = buildScoreResult(repo, signals);
-
+  const result = await scoreViaService(canonical);
   setCachedScore(owner, name, result);
   return result;
 }

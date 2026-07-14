@@ -11,9 +11,8 @@ Scores range from **0** (least critical) to **1** (most critical), using Rob Pik
 ## Features
 
 - Input any GitHub repo URL (or `owner/repo`)
-- Collects the same legacy signals as `criticality_score` with **deps.dev disabled**
+- Scores via the official OpenSSF `criticality_score` CLI (**deps.dev disabled**)
 - Overall score plus per-signal breakdown
-- Radar chart of normalized signals
 
 ## Setup
 
@@ -23,18 +22,30 @@ Scores range from **0** (least critical) to **1** (most critical), using Rob Pik
 pnpm install
 ```
 
-### 2. Configure a GitHub token
-
-Create a [GitHub personal access token](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/creating-a-personal-access-token) with read access to public repositories, then:
+### 2. Configure environment
 
 ```bash
 cp .env.example .env.local
-# Edit .env.local and set GITHUB_AUTH_TOKEN=...
+# Edit .env.local:
+#   GITHUB_AUTH_TOKEN=...          # used by score-service / CLI
+#   SCORE_SERVICE_URL=http://localhost:8080
+#   SCORE_SERVICE_TOKEN=dev-shared-secret
 ```
 
-Without a token, GitHub API rate limits are too low for reliable scoring.
+Create a [GitHub personal access token](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/creating-a-personal-access-token) with read access to public repositories. Without it, the CLI hits strict rate limits.
 
-### 3. Run the dev server
+`SCORE_SERVICE_URL` is **required** for the Next.js app. `SCORE_SERVICE_TOKEN` must match the token configured for score-service (Bearer auth on `POST /score`).
+
+### 3. Start the score-service backend
+
+```bash
+cd score-service
+docker compose up --build
+```
+
+Compose loads `../.env.local` for `GITHUB_AUTH_TOKEN` and `SCORE_SERVICE_TOKEN`.
+
+### 4. Run the Next.js dev server
 
 ```bash
 pnpm dev
@@ -57,11 +68,13 @@ Or:
 GET /api/score?url=https://github.com/softmaple/softmaple
 ```
 
-Example response fields: `score`, `partial`, `unavailableSignals`, `repo`, `signals`, `contributions`.
+The BFF proxies to score-service, parses CLI JSON, and returns the UI shape:
 
-- If commit-search mentions are rate-limited, `github_mention_count` is `null`, `partial` is `true`, and that weight-2 signal is **excluded** from the mean (not treated as zero).
+Example fields: `score`, `partial`, `unavailableSignals`, `repo`, `signals`, `contributions`.
+
+- If commit-search mentions are unavailable, `github_mention_count` is `null`, `partial` is `true`, and that weight-2 signal is **excluded** from the mean (not treated as zero).
 - Responses are cached in-process for 15 minutes per `owner/name`.
-- Basic per-IP rate limiting protects the shared GitHub token (10 req/min).
+- Basic per-IP rate limiting protects the backend (10 req/min).
 
 ## Tests
 
@@ -71,7 +84,7 @@ pnpm test
 
 ## How scoring works
 
-Equivalent to OpenSSF’s default / `original_pike` config:
+Scoring is performed by OpenSSF’s CLI inside Docker. The frontend maps CLI output into a signal table using the same default / `original_pike` weights:
 
 | Signal | Weight | Max | Notes |
 |--------|-------:|----:|-------|
@@ -86,16 +99,14 @@ Equivalent to OpenSSF’s default / `original_pike` config:
 | issue_comment_frequency | 1 | 15 | last 90 days |
 | github_mention_count | 2 | 500000 | commit search for `owner/repo` |
 
-Each signal is clamped, optionally inverted, then normalized with \(\log(1+x)\). The final score is the weighted average of those normalized values.
-
-**Note:** deps.dev dependent counts are not used (same as `-depsdev-disable`). Mentions in GitHub commit messages are used as the dependency proxy.
+**Note:** deps.dev dependent counts are not used (same as `-depsdev-disable`).
 
 ## Stack
 
-- [Next.js](https://nextjs.org) (App Router)
+- [Next.js](https://nextjs.org) (App Router) BFF
+- [OpenSSF Criticality Score](https://github.com/ossf/criticality_score) CLI (Go, Docker)
 - TypeScript
 - Tailwind CSS
-- GitHub REST + GraphQL APIs
 
 ## License
 

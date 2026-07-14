@@ -1,6 +1,6 @@
 /**
  * Simple in-process rate limiter for the score API.
- * Protects the shared GitHub token from abuse in single-instance deploys.
+ * Protects score-service / shared GitHub credentials in single-instance deploys.
  */
 
 type Bucket = { timestamps: number[] };

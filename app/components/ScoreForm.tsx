@@ -137,7 +137,8 @@ export function ScoreForm() {
 
       {loading && (
         <p className="text-sm text-zinc-500">
-          Collecting signals from GitHub… this may take 10–30 seconds.
+          Collecting signals via OpenSSF Criticality Score… this may take up
+          to a minute.
         </p>
       )}
 
