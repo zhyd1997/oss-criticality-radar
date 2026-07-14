@@ -43,7 +43,7 @@ export function scoreLevel(score: number): ScoreLevel {
 
 /** Radar / accent color from score magnitude. */
 export function scoreAccent(score: number): string {
-  if (score >= 0.7) return "#22c55e";
+  if (score >= 0.7) return "#ef4444";
   if (score >= 0.4) return "#eab308";
-  return "#f97316";
+  return "#10b981";
 }
