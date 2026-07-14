@@ -3,8 +3,9 @@ services:
     build: .
     ports:
       - "8080:8080"
-    # Optional env files (Compose v2.24+ required:false). Parent .env.local is
-    # the Next.js monorepo convention; score-service/.env is local override.
+    # Inject secrets/config into the container from optional files.
+    # Do NOT re-list GITHUB_AUTH_TOKEN / SCORE_SERVICE_TOKEN under `environment`
+    # with ${VAR:-}: empty host interpolation overrides env_file with blanks.
     env_file:
       - path: ../.env.local
         required: false
@@ -12,9 +13,6 @@ services:
         required: false
     environment:
       PORT: "8080"
-      # Shared secret for POST /score (Bearer token). Leave empty only for local dev.
-      SCORE_SERVICE_TOKEN: ${SCORE_SERVICE_TOKEN:-}
-      # OpenSSF Criticality Score / Scorecard GitHub auth (from env file or shell).
-      GITHUB_AUTH_TOKEN: ${GITHUB_AUTH_TOKEN:-}
-      # Cap concurrent CLI processes (default 2 in server if unset).
+      # Only set non-secret defaults here. Tokens come from env_file (or a real
+      # host export). Optional override when you intentionally export them:
       SCORE_MAX_CONCURRENCY: ${SCORE_MAX_CONCURRENCY:-2}
