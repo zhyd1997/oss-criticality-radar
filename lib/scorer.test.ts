@@ -51,10 +51,14 @@ describe("scoreSignals", () => {
 
     assert.deepEqual(partial.unavailableSignals, ["github_mention_count"]);
     assert.ok(partial.contributions.find((c) => c.key === "github_mention_count")?.excluded);
-    // Excluding a high weight-2 signal changes the score vs treating as 0
+    
+    // Excluding a high weight-2 signal lowers the score (denominator stays same, numerator decreases)
+    // vs treating as 0 (both numerator and denominator affected differently)
     const asZero = scoreSignals({ ...fullSignals, github_mention_count: 0 });
-    assert.notEqual(partial.score, asZero.score);
-    assert.notEqual(partial.score, full.score);
+    
+    // All three should be different: full > partial > asZero
+    assert.ok(full.score > partial.score, "full score should be > partial score");
+    assert.ok(partial.score > asZero.score, "partial score should be > asZero score");
   });
 
   it("buildScoreResult sets partial flag", () => {
