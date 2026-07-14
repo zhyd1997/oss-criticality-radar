@@ -23,18 +23,34 @@ Scores range from **0** (least critical) to **1** (most critical), using Rob Pik
 pnpm install
 ```
 
-### 2. Configure a GitHub token
+### 2. Configure environment
 
 Create a [GitHub personal access token](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/creating-a-personal-access-token) with read access to public repositories, then:
 
 ```bash
 cp .env.example .env.local
-# Edit .env.local and set GITHUB_AUTH_TOKEN=...
+# Edit .env.local:
+#   GITHUB_AUTH_TOKEN=...
+#   SCORE_SERVICE_URL=http://localhost:8080
+#   SCORE_SERVICE_TOKEN=dev-shared-secret
 ```
 
-Without a token, GitHub API rate limits are too low for reliable scoring.
+Without a GitHub token, API rate limits are too low for reliable scoring.
 
-### 3. Run the dev server
+### 3. Start the score-service backend (recommended)
+
+The UI’s `/api/score` route proxies to a Dockerized OpenSSF `criticality_score` CLI when `SCORE_SERVICE_URL` is set:
+
+```bash
+cd score-service
+docker compose up --build
+```
+
+The compose file loads `../.env.local` for `GITHUB_AUTH_TOKEN` and optional `SCORE_SERVICE_TOKEN`.
+
+If `SCORE_SERVICE_URL` is unset, the app falls back to the in-process TypeScript collector.
+
+### 4. Run the Next.js dev server
 
 ```bash
 pnpm dev
@@ -92,10 +108,11 @@ Each signal is clamped, optionally inverted, then normalized with \(\log(1+x)\).
 
 ## Stack
 
-- [Next.js](https://nextjs.org) (App Router)
+- [Next.js](https://nextjs.org) (App Router) BFF → optional Go score-service
+- [OpenSSF Criticality Score](https://github.com/ossf/criticality_score) CLI (Docker)
 - TypeScript
 - Tailwind CSS
-- GitHub REST + GraphQL APIs
+- GitHub REST + GraphQL APIs (fallback path only)
 
 ## License
 

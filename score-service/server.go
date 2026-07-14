@@ -220,7 +220,13 @@ func canonicalizeGitHubRepoURL(raw string) (string, error) {
 // runCriticalityScore executes the CLI with an argv array (never a shell).
 // Returns a scoreResponse and the HTTP status to send to the client.
 func runCriticalityScore(ctx context.Context, repoURL string) (scoreResponse, int) {
-	cmd := exec.CommandContext(ctx, cliBinary, "-depsdev-disable", repoURL)
+	// Argv only (no shell). JSON on stdout for the BFF; quiet logs on stderr.
+	cmd := exec.CommandContext(ctx, cliBinary,
+		"-depsdev-disable",
+		"-format", "json",
+		"-log", "error",
+		repoURL,
+	)
 
 	var stdout, stderr strings.Builder
 	cmd.Stdout = &stdout

@@ -1,9 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { GitHubError } from "@/lib/github";
 import { checkRateLimit } from "@/lib/rate-limit";
+import { ScoreServiceError } from "@/lib/score-service-client";
 import { scoreRepoUrl } from "@/lib/score";
 
-export const maxDuration = 60;
+// Allow waiting on score-service (CLI timeout is 90s).
+export const maxDuration = 120;
 
 function clientKey(request: NextRequest): string {
   return (
@@ -14,6 +16,17 @@ function clientKey(request: NextRequest): string {
 }
 
 function errorResponse(err: unknown): NextResponse {
+  if (err instanceof ScoreServiceError) {
+    const status =
+      err.status >= 400 && err.status < 600 ? err.status : 502;
+    return NextResponse.json(
+      {
+        error: err.message,
+        code: err.code ?? "score_service_error",
+      },
+      { status },
+    );
+  }
   if (err instanceof GitHubError) {
     const status =
       err.status >= 400 && err.status < 600 ? err.status : 502;
