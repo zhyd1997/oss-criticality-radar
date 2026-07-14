@@ -23,9 +23,8 @@ ARG TARGETARCH
 WORKDIR /src
 
 # Cache module downloads when go.mod changes less often than source.
-# go.sum is optional (stdlib-only service may not have one).
+# Stdlib-only service: no go.sum required.
 COPY go.mod ./
-COPY go.sum* ./
 RUN go mod download
 
 COPY server.go ./

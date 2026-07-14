@@ -2,11 +2,14 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"os/exec"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestCanonicalizeGitHubRepoURL(t *testing.T) {
@@ -144,16 +147,76 @@ func TestScoreHandler_Auth(t *testing.T) {
 	})
 
 	t.Run("valid bearer reaches handler past auth", func(t *testing.T) {
-		// Auth passes; CLI may be missing → 500, not 401.
+		// Deterministic success: ignore real CLI; exit 0 with empty stdout.
+		restoreCommandContext(t, func(ctx context.Context, name string, arg ...string) *exec.Cmd {
+			return exec.CommandContext(ctx, "true")
+		})
+
 		rr := postScore(t, h, `{"repoUrl":"https://github.com/o/r"}`, "Bearer secret-token")
-		if rr.Code == http.StatusUnauthorized {
-			t.Fatalf("unexpected 401 body=%s", rr.Body.String())
-		}
-		if rr.Code != http.StatusOK && rr.Code != http.StatusInternalServerError && rr.Code != http.StatusGatewayTimeout {
-			// Accept CLI outcomes; reject only unexpected statuses.
+		if rr.Code != http.StatusOK {
 			t.Fatalf("status=%d body=%s", rr.Code, rr.Body.String())
 		}
+		var resp scoreResponse
+		if err := json.Unmarshal(rr.Body.Bytes(), &resp); err != nil {
+			t.Fatalf("json: %v body=%s", err, rr.Body.String())
+		}
+		if resp.Code != 0 {
+			t.Fatalf("code=%d body=%s", resp.Code, rr.Body.String())
+		}
 	})
+}
+
+func TestRunCriticalityScore_ExitCode(t *testing.T) {
+	restoreCommandContext(t, func(ctx context.Context, name string, arg ...string) *exec.Cmd {
+		// false exits 1 on POSIX.
+		return exec.CommandContext(ctx, "false")
+	})
+
+	resp, status := runCriticalityScore(context.Background(), "https://github.com/o/r")
+	if status != http.StatusOK {
+		t.Fatalf("status=%d", status)
+	}
+	if resp.Code != 1 {
+		t.Fatalf("code=%d stderr=%q", resp.Code, resp.Stderr)
+	}
+}
+
+func TestRunCriticalityScore_Success(t *testing.T) {
+	restoreCommandContext(t, func(ctx context.Context, name string, arg ...string) *exec.Cmd {
+		return exec.CommandContext(ctx, "true")
+	})
+
+	resp, status := runCriticalityScore(context.Background(), "https://github.com/o/r")
+	if status != http.StatusOK || resp.Code != 0 {
+		t.Fatalf("status=%d code=%d stderr=%q", status, resp.Code, resp.Stderr)
+	}
+}
+
+func TestRunCriticalityScore_Timeout(t *testing.T) {
+	restoreCommandContext(t, func(ctx context.Context, name string, arg ...string) *exec.Cmd {
+		return exec.CommandContext(ctx, "sleep", "30")
+	})
+
+	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+	defer cancel()
+
+	start := time.Now()
+	resp, status := runCriticalityScore(ctx, "https://github.com/o/r")
+	elapsed := time.Since(start)
+
+	if status != http.StatusGatewayTimeout {
+		t.Fatalf("status=%d body code=%d stderr=%q", status, resp.Code, resp.Stderr)
+	}
+	if resp.Code != -1 {
+		t.Fatalf("code=%d", resp.Code)
+	}
+	if !strings.Contains(resp.Stderr, "timed out") {
+		t.Fatalf("stderr=%q", resp.Stderr)
+	}
+	// Should return promptly (well under sleep 30), allowing for WaitDelay.
+	if elapsed > 5*time.Second {
+		t.Fatalf("timeout path too slow: %v", elapsed)
+	}
 }
 
 func TestHealthHandler(t *testing.T) {
@@ -178,6 +241,13 @@ func postScore(t *testing.T, h http.HandlerFunc, body, auth string) *httptest.Re
 	}
 	h(rr, req)
 	return rr
+}
+
+func restoreCommandContext(t *testing.T, fn func(ctx context.Context, name string, arg ...string) *exec.Cmd) {
+	t.Helper()
+	prev := commandContext
+	commandContext = fn
+	t.Cleanup(func() { commandContext = prev })
 }
 
 func TestAppendLine(t *testing.T) {

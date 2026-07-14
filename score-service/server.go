@@ -23,9 +23,19 @@ const (
 	defaultPort           = "8080"
 	defaultMaxConcurrency = 2
 	commandTimeout        = 90 * time.Second
-	cliBinary             = "criticality_score"
-	authHeaderPrefix      = "Bearer "
+	// How long to wait for stdout/stderr pipes after the process is killed.
+	// Keeps concurrency slots from sticking after CommandContext cancel.
+	commandWaitDelay = 2 * time.Second
+	cliBinaryName    = "criticality_score"
+	authHeaderPrefix = "Bearer "
 )
+
+// commandContext is the process factory (overridable in tests).
+var commandContext = exec.CommandContext
+
+// cliPath is the resolved path to criticality_score (set in main via LookPath).
+// Tests may override this; production always uses LookPath result.
+var cliPath = cliBinaryName
 
 // scoreRequest is the JSON body for POST /score.
 type scoreRequest struct {
@@ -47,6 +57,12 @@ type errorResponse struct {
 }
 
 func main() {
+	resolved, err := exec.LookPath(cliBinaryName)
+	if err != nil {
+		log.Fatalf("criticality_score not found in PATH: %v", err)
+	}
+	cliPath = resolved
+
 	port := envOr("PORT", defaultPort)
 	token := strings.TrimSpace(os.Getenv("SCORE_SERVICE_TOKEN"))
 	maxConc := envIntOr("SCORE_MAX_CONCURRENCY", defaultMaxConcurrency)
@@ -83,7 +99,7 @@ func main() {
 	defer stop()
 
 	go func() {
-		log.Printf("score-service listening on %s (max concurrency=%d)", srv.Addr, maxConc)
+		log.Printf("score-service listening on %s (max concurrency=%d, cli=%s)", srv.Addr, maxConc, cliPath)
 		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			log.Fatalf("server failed: %v", err)
 		}
@@ -221,12 +237,14 @@ func canonicalizeGitHubRepoURL(raw string) (string, error) {
 // Returns a scoreResponse and the HTTP status to send to the client.
 func runCriticalityScore(ctx context.Context, repoURL string) (scoreResponse, int) {
 	// Argv only (no shell). JSON on stdout for the BFF; quiet logs on stderr.
-	cmd := exec.CommandContext(ctx, cliBinary,
+	cmd := commandContext(ctx, cliPath,
 		"-depsdev-disable",
 		"-format", "json",
 		"-log", "error",
 		repoURL,
 	)
+	// After cancel/kill, do not block forever on pipe readers holding Wait open.
+	cmd.WaitDelay = commandWaitDelay
 
 	var stdout, stderr strings.Builder
 	cmd.Stdout = &stdout
