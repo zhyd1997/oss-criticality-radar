@@ -9,7 +9,7 @@ import {
 import { ScoreResultView } from "./ScoreResult";
 
 const EXAMPLES = [
-  "https://github.com/kubernetes/kubernetes",
+  "https://github.com/softmaple/softmaple",
   "https://github.com/vercel/next.js",
   "https://github.com/ossf/criticality_score",
 ];
