@@ -1,4 +1,7 @@
-/** Signals used by the OpenSSF criticality score (original_pike / default config). */
+/**
+ * OpenSSF criticality signals (original_pike / default config).
+ * `null` means the signal could not be collected and is excluded from the score.
+ */
 export type CriticalitySignals = {
   created_since: number;
   updated_since: number;
@@ -9,7 +12,8 @@ export type CriticalitySignals = {
   updated_issues_count: number;
   closed_issues_count: number;
   issue_comment_frequency: number;
-  github_mention_count: number;
+  /** null when commit search is rate-limited / unavailable (weight 2 — do not fake as 0). */
+  github_mention_count: number | null;
 };
 
 export type RepoMeta = {
@@ -25,26 +29,52 @@ export type RepoMeta = {
 export type SignalContribution = {
   key: keyof CriticalitySignals;
   label: string;
-  raw: number;
-  /** Normalized contribution in [0, 1] after bounds + zipfian. */
-  normalized: number;
+  raw: number | null;
+  /** Normalized contribution in [0, 1] after bounds + zipfian; null if excluded. */
+  normalized: number | null;
   weight: number;
-  /** weight * normalized */
-  weighted: number;
+  /** weight * normalized; null if excluded. */
+  weighted: number | null;
   threshold: number;
   smallerIsBetter: boolean;
   description: string;
+  excluded: boolean;
 };
 
 export type ScoreResult = {
   score: number;
+  /** True when one or more weighted signals were unavailable and excluded. */
+  partial: boolean;
+  unavailableSignals: Array<keyof CriticalitySignals>;
   repo: RepoMeta;
   signals: CriticalitySignals;
   contributions: SignalContribution[];
   collectedAt: string;
 };
 
-export type ScoreError = {
+export type ScoreErrorBody = {
   error: string;
   code?: string;
 };
+
+export function isScoreResult(value: unknown): value is ScoreResult {
+  if (typeof value !== "object" || value === null) return false;
+  const v = value as Record<string, unknown>;
+  return (
+    typeof v.score === "number" &&
+    typeof v.partial === "boolean" &&
+    typeof v.repo === "object" &&
+    v.repo !== null &&
+    typeof v.signals === "object" &&
+    v.signals !== null &&
+    Array.isArray(v.contributions)
+  );
+}
+
+export function isScoreErrorBody(value: unknown): value is ScoreErrorBody {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    typeof (value as ScoreErrorBody).error === "string"
+  );
+}

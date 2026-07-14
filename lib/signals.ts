@@ -1,12 +1,10 @@
 import {
-  getGitHubToken,
-  githubGraphql,
-  githubRest,
+  countViaLinkHeader,
+  createGitHubClient,
   GitHubError,
-  monthsBetween,
-  parseLastPage,
-  round,
+  type GitHubClient,
 } from "./github";
+import { monthsBetween, round } from "./math";
 import type { CriticalitySignals, RepoMeta } from "./types";
 
 const MAX_CONTRIBUTOR_LIMIT = 5000;
@@ -92,42 +90,26 @@ query MoreReleases($owner: String!, $name: String!, $after: String!) {
 
 type Contributor = {
   login?: string | null;
-  type?: string;
-  contributions?: number;
 };
-
-type UserCompany = { company: string | null };
 
 /**
  * Collect OpenSSF criticality score signals for a GitHub repository.
  * Equivalent to: criticality_score -depsdev-disable https://github.com/owner/repo
- * (deps.dev disabled; uses GitHub commit-mention count as dependents proxy).
  */
 export async function collectSignals(
   owner: string,
   name: string,
+  client: GitHubClient = createGitHubClient(),
 ): Promise<{ repo: RepoMeta; signals: CriticalitySignals }> {
-  const token = getGitHubToken();
-  if (!token) {
-    throw new GitHubError(
-      "GitHub token required. Set GITHUB_AUTH_TOKEN or GITHUB_TOKEN in your environment.",
-      401,
-    );
-  }
-
   const now = new Date();
   const commitSince = new Date(now.getTime() - COMMIT_LOOKBACK_MS).toISOString();
 
-  const basic = await githubGraphql<BasicRepoGraphql>(
-    BASIC_QUERY,
-    {
-      owner,
-      name,
-      since: commitSince,
-      releaseFirst: 100,
-    },
-    token,
-  );
+  const basic = await client.graphql<BasicRepoGraphql>(BASIC_QUERY, {
+    owner,
+    name,
+    since: commitSince,
+    releaseFirst: 100,
+  });
 
   if (!basic.repository) {
     throw new GitHubError(`Repository ${owner}/${name} not found`, 404);
@@ -143,81 +125,35 @@ export async function collectSignals(
     repo.defaultBranchRef?.target?.recentCommits.totalCount ?? 0;
   const commitFrequency = round(recentCommits / 52, 2);
 
-  // Recent releases in last year (paginate if needed)
-  let recentReleaseCount = countReleasesSince(
-    repo.releases.nodes.map((n) => n.createdAt),
+  const recentReleaseCount = await countRecentReleases(
+    client,
+    owner,
+    name,
+    repo,
+    createdAt,
     now,
   );
-  let cursor = repo.releases.pageInfo.endCursor;
-  let hasMore = repo.releases.pageInfo.hasNextPage;
-  // Only paginate while releases might still be within the lookback window
-  while (hasMore && cursor && recentReleaseCount >= 100) {
-    const more = await githubGraphql<{
-      repository: {
-        releases: {
-          nodes: Array<{ createdAt: string }>;
-          pageInfo: { hasNextPage: boolean; endCursor: string | null };
-        };
-      } | null;
-    }>(MORE_RELEASES_QUERY, { owner, name, after: cursor }, token);
 
-    const releases = more.repository?.releases;
-    if (!releases) break;
-
-    const dates = releases.nodes.map((n) => n.createdAt);
-    const cutoff = now.getTime() - RELEASE_LOOKBACK_MS;
-    let hitOld = false;
-    for (const d of dates) {
-      if (new Date(d).getTime() >= cutoff) {
-        recentReleaseCount++;
-      } else {
-        hitOld = true;
-        break;
-      }
-    }
-    if (hitOld) break;
-    hasMore = releases.pageInfo.hasNextPage;
-    cursor = releases.pageInfo.endCursor;
-  }
-
-  // Fallback when no formal releases: estimate from tags (matches criticality_score)
-  if (recentReleaseCount === 0) {
-    const daysSinceCreated = Math.floor(
-      (now.getTime() - createdAt.getTime()) / (1000 * 60 * 60 * 24),
-    );
-    if (daysSinceCreated > 0) {
-      recentReleaseCount = Math.floor(
-        (repo.tags.totalCount * 365) / daysSinceCreated,
-      );
-    }
-  }
-
-  // Parallel REST fetches for remaining signals
   const [
     contributorCount,
     orgCount,
     closedIssues,
     updatedIssues,
-    commentFrequency,
+    commentCount,
     mentionCount,
   ] = await Promise.all([
-    fetchContributorCount(owner, name, token),
-    fetchOrgCount(owner, name, token),
-    fetchIssueCount(owner, name, "closed", token),
-    fetchIssueCount(owner, name, "all", token),
-    fetchCommentFrequency(owner, name, token),
-    fetchGithubMentionCount(owner, name, token),
+    fetchContributorCount(client, owner, name),
+    fetchOrgCount(client, owner, name),
+    fetchIssueCount(client, owner, name, "closed"),
+    fetchIssueCount(client, owner, name, "all"),
+    fetchCommentCount(client, owner, name),
+    fetchGithubMentionCount(client, owner, name),
   ]);
 
-  // comment frequency needs updated issues count
-  let issueCommentFrequency = 0;
-  if (updatedIssues === 0) {
-    issueCommentFrequency = 0;
-  } else if (commentFrequency === "too_many") {
-    issueCommentFrequency = TOO_MANY_COMMENTS_FREQUENCY;
-  } else {
-    issueCommentFrequency = round(commentFrequency / updatedIssues, 2);
-  }
+  const issueCommentFrequency = computeCommentFrequency(
+    updatedIssues,
+    commentCount,
+  );
 
   const signals: CriticalitySignals = {
     created_since: monthsBetween(now, createdAt),
@@ -245,51 +181,106 @@ export async function collectSignals(
   return { repo: meta, signals };
 }
 
-function countReleasesSince(dates: string[], now: Date): number {
+function computeCommentFrequency(
+  updatedIssues: number,
+  commentCount: number | "capped",
+): number {
+  if (updatedIssues === 0) return 0;
+  if (commentCount === "capped") return TOO_MANY_COMMENTS_FREQUENCY;
+  return round(commentCount / updatedIssues, 2);
+}
+
+function countReleasesInWindow(dates: string[], now: Date): number {
   const cutoff = now.getTime() - RELEASE_LOOKBACK_MS;
   return dates.filter((d) => new Date(d).getTime() >= cutoff).length;
 }
 
-async function fetchContributorCount(
+async function countRecentReleases(
+  client: GitHubClient,
   owner: string,
   name: string,
-  token: string,
+  repo: NonNullable<BasicRepoGraphql["repository"]>,
+  createdAt: Date,
+  now: Date,
 ): Promise<number> {
-  try {
-    const { data, headers } = await githubRest<Contributor[]>(
-      `/repos/${owner}/${name}/contributors?anon=1&per_page=1`,
-      token,
-    );
+  let recentReleaseCount = countReleasesInWindow(
+    repo.releases.nodes.map((n) => n.createdAt),
+    now,
+  );
+  let cursor = repo.releases.pageInfo.endCursor;
+  let hasMore = repo.releases.pageInfo.hasNextPage;
 
-    const last = parseLastPage(headers.get("link"));
-    if (last === null) {
-      return Array.isArray(data) ? data.length : 0;
-    }
-    return Math.min(last, MAX_CONTRIBUTOR_LIMIT);
-  } catch (err) {
-    if (err instanceof GitHubError && err.status === 403) {
-      // "list is too large" or similar
-      if (err.message.toLowerCase().includes("too large")) {
-        return MAX_CONTRIBUTOR_LIMIT;
-      }
-    }
-    // Empty / 204 for empty repos
-    if (err instanceof GitHubError && (err.status === 204 || err.status === 404)) {
-      return 0;
-    }
-    throw err;
+  // Paginate only while the full page may still fall inside the lookback window.
+  while (hasMore && cursor && recentReleaseCount >= 100) {
+    const more = await client.graphql<{
+      repository: {
+        releases: {
+          nodes: Array<{ createdAt: string }>;
+          pageInfo: { hasNextPage: boolean; endCursor: string | null };
+        };
+      } | null;
+    }>(MORE_RELEASES_QUERY, { owner, name, after: cursor });
+
+    const releases = more.repository?.releases;
+    if (!releases) break;
+
+    const pageCount = countReleasesInWindow(
+      releases.nodes.map((n) => n.createdAt),
+      now,
+    );
+    recentReleaseCount += pageCount;
+
+    // If this page had older releases, further pages are older too.
+    if (pageCount < releases.nodes.length) break;
+
+    hasMore = releases.pageInfo.hasNextPage;
+    cursor = releases.pageInfo.endCursor;
   }
+
+  // Fallback when no formal releases: estimate from tags (matches criticality_score).
+  if (recentReleaseCount === 0) {
+    const daysSinceCreated = Math.floor(
+      (now.getTime() - createdAt.getTime()) / (1000 * 60 * 60 * 24),
+    );
+    if (daysSinceCreated > 0) {
+      recentReleaseCount = Math.floor(
+        (repo.tags.totalCount * 365) / daysSinceCreated,
+      );
+    }
+  }
+
+  return recentReleaseCount;
+}
+
+async function fetchContributorCount(
+  client: GitHubClient,
+  owner: string,
+  name: string,
+): Promise<number> {
+  const result = await countViaLinkHeader(
+    client,
+    `/repos/${owner}/${name}/contributors?anon=1&per_page=1`,
+    {
+      maxExact: MAX_CONTRIBUTOR_LIMIT,
+      onOverflow: {
+        mode: "cap",
+        value: MAX_CONTRIBUTOR_LIMIT,
+        reason: "contributor_list_too_large",
+      },
+    },
+  );
+  if (result.kind === "unavailable") return 0;
+  return result.value;
 }
 
 async function fetchOrgCount(
+  client: GitHubClient,
   owner: string,
   name: string,
-  token: string,
 ): Promise<number> {
   try {
-    const { data } = await githubRest<Contributor[]>(
+    const { data } = await client.rest<Contributor[]>(
       `/repos/${owner}/${name}/contributors?per_page=${MAX_TOP_CONTRIBUTORS}`,
-      token,
     );
 
     if (!Array.isArray(data) || data.length === 0) return 0;
@@ -300,38 +291,35 @@ async function fetchOrgCount(
 
     if (logins.length === 0) return 0;
 
-    // Batch company lookup via GraphQL
-    const aliases = logins.map((login, i) => {
-      const alias = `u${i}`;
-      return `${alias}: user(login: "${login}") { company }`;
+    // GraphQL aliases with variables — logins never interpolated into the query string.
+    const selections = logins
+      .map((_, i) => `u${i}: user(login: $login${i}) { company }`)
+      .join("\n");
+    const varDefs = logins.map((_, i) => `$login${i}: String!`).join(", ");
+    const query = `query UserCompanies(${varDefs}) {\n${selections}\n}`;
+    const variables: Record<string, string> = {};
+    logins.forEach((login, i) => {
+      variables[`login${i}`] = login;
     });
-    const query = `query { ${aliases.join("\n")} }`;
 
-    type BatchUsers = Record<string, UserCompany | null>;
-    const result = await githubGraphql<BatchUsers>(query, {}, token);
-
-    const orgFilter = (company: string) =>
-      company
-        .toLowerCase()
-        .replace(/inc\./g, "")
-        .replace(/llc/g, "")
-        .replace(/@/g, "")
-        .replace(/ /g, "")
-        .replace(/,+$/, "");
+    type BatchUsers = Record<string, { company: string | null } | null>;
+    const result = await client.graphql<BatchUsers>(query, variables);
 
     const orgs = new Set<string>();
     for (const value of Object.values(result)) {
       if (value?.company) {
-        const org = orgFilter(value.company);
+        const org = normalizeCompany(value.company);
         if (org) orgs.add(org);
       }
     }
     return orgs.size;
   } catch (err) {
-    if (err instanceof GitHubError && err.status === 403) {
-      if (err.message.toLowerCase().includes("too large")) {
-        return TOO_MANY_CONTRIBUTORS_ORG_COUNT;
-      }
+    if (
+      err instanceof GitHubError &&
+      err.status === 403 &&
+      err.message.toLowerCase().includes("too large")
+    ) {
+      return TOO_MANY_CONTRIBUTORS_ORG_COUNT;
     }
     if (err instanceof GitHubError && (err.status === 204 || err.status === 404)) {
       return 0;
@@ -340,69 +328,73 @@ async function fetchOrgCount(
   }
 }
 
+function normalizeCompany(company: string): string {
+  return company
+    .toLowerCase()
+    .replace(/inc\./g, "")
+    .replace(/llc/g, "")
+    .replace(/@/g, "")
+    .replace(/ /g, "")
+    .replace(/,+$/, "");
+}
+
 async function fetchIssueCount(
+  client: GitHubClient,
   owner: string,
   name: string,
   state: "all" | "open" | "closed",
-  token: string,
 ): Promise<number> {
   const since = new Date(Date.now() - ISSUE_LOOKBACK_MS).toISOString();
-  try {
-    const { data, headers } = await githubRest<unknown[]>(
-      `/repos/${owner}/${name}/issues?state=${state}&since=${encodeURIComponent(since)}&per_page=1`,
-      token,
-    );
-
-    const last = parseLastPage(headers.get("link"));
-    if (last === null) {
-      return Array.isArray(data) ? data.length : 0;
-    }
-    return Math.min(last, MAX_ISSUES_LIMIT);
-  } catch (err) {
-    // GitHub returns 5xx when there are too many issues
-    if (err instanceof GitHubError && err.status >= 500 && err.status < 600) {
-      return MAX_ISSUES_LIMIT;
-    }
-    throw err;
-  }
+  const result = await countViaLinkHeader(
+    client,
+    `/repos/${owner}/${name}/issues?state=${state}&since=${encodeURIComponent(since)}&per_page=1`,
+    {
+      maxExact: MAX_ISSUES_LIMIT,
+      onOverflow: {
+        mode: "cap",
+        value: MAX_ISSUES_LIMIT,
+        reason: "issue_list_too_large",
+      },
+    },
+  );
+  if (result.kind === "unavailable") return MAX_ISSUES_LIMIT;
+  return result.value;
 }
 
-async function fetchCommentFrequency(
+async function fetchCommentCount(
+  client: GitHubClient,
   owner: string,
   name: string,
-  token: string,
-): Promise<number | "too_many"> {
+): Promise<number | "capped"> {
   const since = new Date(Date.now() - ISSUE_LOOKBACK_MS).toISOString();
-  try {
-    const { data, headers } = await githubRest<unknown[]>(
-      `/repos/${owner}/${name}/issues/comments?since=${encodeURIComponent(since)}&per_page=1`,
-      token,
-    );
-
-    const last = parseLastPage(headers.get("link"));
-    if (last === null) {
-      return Array.isArray(data) ? data.length : 0;
-    }
-    return last;
-  } catch (err) {
-    if (err instanceof GitHubError && err.status >= 500 && err.status < 600) {
-      return "too_many";
-    }
-    throw err;
-  }
+  const result = await countViaLinkHeader(
+    client,
+    `/repos/${owner}/${name}/issues/comments?since=${encodeURIComponent(since)}&per_page=1`,
+    {
+      onOverflow: {
+        mode: "unavailable",
+        reason: "comment_list_too_large",
+      },
+    },
+  );
+  if (result.kind === "unavailable") return "capped";
+  return result.value;
 }
 
+/**
+ * Commit-search mention count (dependents proxy when deps.dev is disabled).
+ * Returns null when search is rate-limited / forbidden so the scorer excludes
+ * this weight-2 signal instead of treating it as zero.
+ */
 async function fetchGithubMentionCount(
+  client: GitHubClient,
   owner: string,
   name: string,
-  token: string,
-): Promise<number> {
-  // Search commits for mentions of "owner/name" — same as criticality_score githubmentions
+): Promise<number | null> {
   const q = encodeURIComponent(`"${owner}/${name}"`);
   try {
-    const { data } = await githubRest<{ total_count: number }>(
+    const { data } = await client.rest<{ total_count: number }>(
       `/search/commits?q=${q}&per_page=1`,
-      token,
       {
         headers: {
           Accept: "application/vnd.github.cloak-preview+json",
@@ -411,9 +403,11 @@ async function fetchGithubMentionCount(
     );
     return data.total_count ?? 0;
   } catch (err) {
-    // Search API can be flaky; don't fail the whole score
-    if (err instanceof GitHubError && (err.status === 422 || err.status === 403)) {
-      return 0;
+    if (
+      err instanceof GitHubError &&
+      (err.status === 422 || err.status === 403)
+    ) {
+      return null;
     }
     throw err;
   }

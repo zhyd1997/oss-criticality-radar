@@ -57,7 +57,17 @@ Or:
 GET /api/score?url=https://github.com/kubernetes/kubernetes
 ```
 
-Example response fields: `score`, `repo`, `signals`, `contributions`.
+Example response fields: `score`, `partial`, `unavailableSignals`, `repo`, `signals`, `contributions`.
+
+- If commit-search mentions are rate-limited, `github_mention_count` is `null`, `partial` is `true`, and that weight-2 signal is **excluded** from the mean (not treated as zero).
+- Responses are cached in-process for 15 minutes per `owner/name`.
+- Basic per-IP rate limiting protects the shared GitHub token (10 req/min).
+
+## Tests
+
+```bash
+pnpm test
+```
 
 ## How scoring works
 

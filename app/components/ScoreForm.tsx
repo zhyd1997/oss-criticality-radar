@@ -1,7 +1,11 @@
 "use client";
 
 import { useState, type FormEvent } from "react";
-import type { ScoreResult } from "@/lib/types";
+import {
+  isScoreErrorBody,
+  isScoreResult,
+  type ScoreResult,
+} from "@/lib/types";
 import { ScoreResultView } from "./ScoreResult";
 
 const EXAMPLES = [
@@ -10,22 +14,27 @@ const EXAMPLES = [
   "https://github.com/ossf/criticality_score",
 ];
 
+type FormState =
+  | { status: "idle" }
+  | { status: "loading" }
+  | { status: "error"; message: string }
+  | { status: "success"; result: ScoreResult };
+
 export function ScoreForm() {
   const [url, setUrl] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [result, setResult] = useState<ScoreResult | null>(null);
+  const [state, setState] = useState<FormState>({ status: "idle" });
 
   async function analyze(repoUrl: string) {
     const trimmed = repoUrl.trim();
     if (!trimmed) {
-      setError("Please enter a GitHub repository URL");
+      setState({
+        status: "error",
+        message: "Please enter a GitHub repository URL",
+      });
       return;
     }
 
-    setLoading(true);
-    setError(null);
-    setResult(null);
+    setState({ status: "loading" });
 
     try {
       const res = await fetch("/api/score", {
@@ -34,18 +43,30 @@ export function ScoreForm() {
         body: JSON.stringify({ url: trimmed }),
       });
 
-      const data = (await res.json()) as ScoreResult | { error: string };
+      const data: unknown = await res.json();
 
       if (!res.ok) {
-        setError("error" in data ? data.error : "Failed to compute score");
+        const message = isScoreErrorBody(data)
+          ? data.error
+          : "Failed to compute score";
+        setState({ status: "error", message });
         return;
       }
 
-      setResult(data as ScoreResult);
+      if (!isScoreResult(data)) {
+        setState({
+          status: "error",
+          message: "Unexpected response from score API",
+        });
+        return;
+      }
+
+      setState({ status: "success", result: data });
     } catch {
-      setError("Network error. Please try again.");
-    } finally {
-      setLoading(false);
+      setState({
+        status: "error",
+        message: "Network error. Please try again.",
+      });
     }
   }
 
@@ -53,6 +74,8 @@ export function ScoreForm() {
     e.preventDefault();
     void analyze(url);
   }
+
+  const loading = state.status === "loading";
 
   return (
     <div className="flex w-full flex-col gap-8">
@@ -110,12 +133,12 @@ export function ScoreForm() {
         </div>
       </form>
 
-      {error && (
+      {state.status === "error" && (
         <div
           role="alert"
           className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800 dark:border-red-900/50 dark:bg-red-950/40 dark:text-red-200"
         >
-          {error}
+          {state.message}
         </div>
       )}
 
@@ -133,7 +156,7 @@ export function ScoreForm() {
         </div>
       )}
 
-      {result && !loading && <ScoreResultView result={result} />}
+      {state.status === "success" && <ScoreResultView result={state.result} />}
     </div>
   );
 }

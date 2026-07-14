@@ -1,3 +1,4 @@
+import { clamp, round } from "./math";
 import type {
   CriticalitySignals,
   ScoreResult,
@@ -9,8 +10,10 @@ import type {
  * Rob Pike weighted arithmetic mean with zipfian normalization.
  * Matches ossf/criticality_score original_pike.yml / default_config.yml.
  *
+ * Missing signals (null) are skipped — same as OpenSSF when a field is unset.
+ *
  * score_i = log(1 + bound(S_i)) / log(1 + T_i)
- * score   = sum(α_i * score_i) / sum(α_i)
+ * score   = sum(α_i * score_i) / sum(α_i over present inputs)
  */
 
 type SignalConfig = {
@@ -97,12 +100,6 @@ export const SIGNAL_CONFIG: SignalConfig[] = [
   },
 ];
 
-function clamp(value: number, lower: number, upper: number): number {
-  if (value < lower) return lower;
-  if (value > upper) return upper;
-  return value;
-}
-
 /** Zipfian: log(1 + v) — same as criticality_score distribution "zipfian". */
 function zipfian(v: number): number {
   return Math.log(1 + v);
@@ -132,15 +129,35 @@ export function normalizeSignal(
 export function scoreSignals(signals: CriticalitySignals): {
   score: number;
   contributions: SignalContribution[];
+  unavailableSignals: Array<keyof CriticalitySignals>;
 } {
   let itemSum = 0;
   let itemCount = 0;
   const contributions: SignalContribution[] = [];
+  const unavailableSignals: Array<keyof CriticalitySignals> = [];
 
   for (const cfg of SIGNAL_CONFIG) {
     const raw = signals[cfg.key];
     const lower = cfg.lower ?? 0;
     const smallerIsBetter = cfg.smallerIsBetter ?? false;
+
+    if (raw === null || raw === undefined || Number.isNaN(raw)) {
+      unavailableSignals.push(cfg.key);
+      contributions.push({
+        key: cfg.key,
+        label: cfg.label,
+        raw: null,
+        normalized: null,
+        weight: cfg.weight,
+        weighted: null,
+        threshold: cfg.upper,
+        smallerIsBetter,
+        description: cfg.description,
+        excluded: true,
+      });
+      continue;
+    }
+
     const normalized = normalizeSignal(raw, cfg.upper, lower, smallerIsBetter);
     const weighted = cfg.weight * normalized;
 
@@ -157,28 +174,26 @@ export function scoreSignals(signals: CriticalitySignals): {
       threshold: cfg.upper,
       smallerIsBetter,
       description: cfg.description,
+      excluded: false,
     });
   }
 
   const score = itemCount === 0 ? 0 : itemSum / itemCount;
-  return { score, contributions };
+  return { score, contributions, unavailableSignals };
 }
 
 export function buildScoreResult(
   repo: RepoMeta,
   signals: CriticalitySignals,
 ): ScoreResult {
-  const { score, contributions } = scoreSignals(signals);
+  const { score, contributions, unavailableSignals } = scoreSignals(signals);
   return {
     score: round(score, 5),
+    partial: unavailableSignals.length > 0,
+    unavailableSignals,
     repo,
     signals,
     contributions,
     collectedAt: new Date().toISOString(),
   };
-}
-
-export function round(v: number, p: number): number {
-  const m = 10 ** p;
-  return Math.round(v * m) / m;
 }

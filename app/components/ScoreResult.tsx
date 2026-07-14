@@ -8,31 +8,39 @@ type Props = {
 };
 
 function scoreLevel(score: number): { label: string; color: string } {
-  if (score >= 0.8) return { label: "Highly critical", color: "text-red-600 dark:text-red-400" };
-  if (score >= 0.6) return { label: "Critical", color: "text-orange-600 dark:text-orange-400" };
-  if (score >= 0.4) return { label: "Moderately critical", color: "text-yellow-600 dark:text-yellow-400" };
-  if (score >= 0.2) return { label: "Low criticality", color: "text-emerald-600 dark:text-emerald-400" };
+  if (score >= 0.8)
+    return { label: "Highly critical", color: "text-red-600 dark:text-red-400" };
+  if (score >= 0.6)
+    return { label: "Critical", color: "text-orange-600 dark:text-orange-400" };
+  if (score >= 0.4)
+    return {
+      label: "Moderately critical",
+      color: "text-yellow-600 dark:text-yellow-400",
+    };
+  if (score >= 0.2)
+    return {
+      label: "Low criticality",
+      color: "text-emerald-600 dark:text-emerald-400",
+    };
   return { label: "Least critical", color: "text-zinc-500 dark:text-zinc-400" };
 }
 
-function formatRaw(key: string, value: number): string {
-  if (
-    key === "commit_frequency" ||
-    key === "issue_comment_frequency"
-  ) {
+function formatRaw(key: string, value: number | null): string {
+  if (value === null) return "—";
+  if (key === "commit_frequency" || key === "issue_comment_frequency") {
     return value.toFixed(2);
   }
   return Math.round(value).toLocaleString();
 }
 
 export function ScoreResultView({ result }: Props) {
-  const { score, repo, contributions, collectedAt } = result;
+  const { score, repo, contributions, collectedAt, partial, unavailableSignals } =
+    result;
   const level = scoreLevel(score);
   const pct = Math.round(score * 100);
 
   return (
     <section className="flex flex-col gap-6 animate-in">
-      {/* Header card */}
       <div className="overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
         <div className="grid gap-6 p-6 sm:grid-cols-[1fr_auto] sm:items-center">
           <div className="min-w-0">
@@ -68,7 +76,18 @@ export function ScoreResultView({ result }: Props) {
               <span className="rounded-full bg-zinc-100 px-2.5 py-1 dark:bg-zinc-800">
                 ★ {repo.stars.toLocaleString()}
               </span>
+              {partial && (
+                <span className="rounded-full bg-amber-100 px-2.5 py-1 text-amber-800 dark:bg-amber-950 dark:text-amber-200">
+                  Partial score
+                </span>
+              )}
             </div>
+            {partial && (
+              <p className="mt-2 text-xs text-amber-700 dark:text-amber-300">
+                Excluded unavailable signals: {unavailableSignals.join(", ")}.
+                Weights are renormalized over the remaining signals.
+              </p>
+            )}
           </div>
 
           <div className="flex flex-col items-center justify-center rounded-2xl bg-zinc-50 px-8 py-5 dark:bg-zinc-950/60">
@@ -91,7 +110,6 @@ export function ScoreResultView({ result }: Props) {
         </div>
       </div>
 
-      {/* Radar + breakdown */}
       <div className="grid gap-6 lg:grid-cols-[minmax(0,320px)_1fr]">
         <div className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
           <h3 className="mb-2 text-center text-sm font-medium text-zinc-700 dark:text-zinc-300">
@@ -125,7 +143,9 @@ export function ScoreResultView({ result }: Props) {
                 {contributions.map((c) => (
                   <tr
                     key={c.key}
-                    className="border-b border-zinc-50 last:border-0 dark:border-zinc-800/60"
+                    className={`border-b border-zinc-50 last:border-0 dark:border-zinc-800/60 ${
+                      c.excluded ? "opacity-50" : ""
+                    }`}
                   >
                     <td className="px-5 py-3">
                       <div className="font-medium text-zinc-800 dark:text-zinc-200">
@@ -133,6 +153,11 @@ export function ScoreResultView({ result }: Props) {
                         {c.smallerIsBetter && (
                           <span className="ml-1 text-[10px] font-normal text-zinc-400">
                             ↓ better
+                          </span>
+                        )}
+                        {c.excluded && (
+                          <span className="ml-1 text-[10px] font-normal text-amber-600 dark:text-amber-400">
+                            excluded
                           </span>
                         )}
                       </div>
@@ -144,7 +169,7 @@ export function ScoreResultView({ result }: Props) {
                       {formatRaw(c.key, c.raw)}
                     </td>
                     <td className="px-3 py-3 text-right tabular-nums text-zinc-600 dark:text-zinc-400">
-                      {c.normalized.toFixed(3)}
+                      {c.normalized === null ? "—" : c.normalized.toFixed(3)}
                     </td>
                     <td className="px-3 py-3 text-right tabular-nums text-zinc-600 dark:text-zinc-400">
                       {c.weight}
@@ -153,14 +178,16 @@ export function ScoreResultView({ result }: Props) {
                       <div className="flex items-center gap-2">
                         <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-zinc-100 dark:bg-zinc-800">
                           <div
-                            className="h-full rounded-full bg-emerald-500"
+                            className={`h-full rounded-full ${
+                              c.excluded ? "bg-zinc-400" : "bg-emerald-500"
+                            }`}
                             style={{
-                              width: `${Math.round(c.normalized * 100)}%`,
+                              width: `${Math.round((c.normalized ?? 0) * 100)}%`,
                             }}
                           />
                         </div>
                         <span className="w-10 text-right text-xs tabular-nums text-zinc-500">
-                          {(c.weighted).toFixed(2)}
+                          {c.weighted === null ? "—" : c.weighted.toFixed(2)}
                         </span>
                       </div>
                     </td>

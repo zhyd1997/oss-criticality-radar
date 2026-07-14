@@ -9,6 +9,7 @@ type Props = {
 
 /**
  * SVG radar chart of normalized signal contributions (0–1).
+ * Excluded signals plot at the origin.
  */
 export function SignalRadar({ contributions, score }: Props) {
   const n = contributions.length;
@@ -25,7 +26,9 @@ export function SignalRadar({ contributions, score }: Props) {
   };
 
   const rings = [0.25, 0.5, 0.75, 1];
-  const dataPoints = contributions.map((c, i) => point(i, c.normalized * maxR));
+  const dataPoints = contributions.map((c, i) =>
+    point(i, (c.normalized ?? 0) * maxR),
+  );
   const polygon = dataPoints.map(([x, y]) => `${x},${y}`).join(" ");
 
   const scoreColor =
@@ -93,7 +96,7 @@ export function SignalRadar({ contributions, score }: Props) {
             cx={x}
             cy={y}
             r={3.5}
-            fill={scoreColor}
+            fill={contributions[i]?.excluded ? "#a1a1aa" : scoreColor}
             stroke="var(--background)"
             strokeWidth={1.5}
           />
