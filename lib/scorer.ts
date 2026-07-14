@@ -13,7 +13,7 @@ import type {
  * Missing signals (null) are skipped — same as OpenSSF when a field is unset.
  *
  * score_i = log(1 + bound(S_i)) / log(1 + T_i)
- * score   = sum(α_i * score_i) / sum(α_i over present inputs)
+ * score   = sum(α_i * score_i) / sum(α_i over all signals, including null)
  */
 
 type SignalConfig = {
@@ -132,11 +132,14 @@ export function scoreSignals(signals: CriticalitySignals): {
   unavailableSignals: Array<keyof CriticalitySignals>;
 } {
   let itemSum = 0;
-  let itemCount = 0;
+  let totalWeight = 0;
   const contributions: SignalContribution[] = [];
   const unavailableSignals: Array<keyof CriticalitySignals> = [];
 
   for (const cfg of SIGNAL_CONFIG) {
+    // Always accumulate total weight (denominator includes all signals)
+    totalWeight += cfg.weight;
+
     const raw = signals[cfg.key];
     const lower = cfg.lower ?? 0;
     const smallerIsBetter = cfg.smallerIsBetter ?? false;
@@ -162,7 +165,6 @@ export function scoreSignals(signals: CriticalitySignals): {
     const weighted = cfg.weight * normalized;
 
     itemSum += weighted;
-    itemCount += cfg.weight;
 
     contributions.push({
       key: cfg.key,
@@ -178,7 +180,7 @@ export function scoreSignals(signals: CriticalitySignals): {
     });
   }
 
-  const score = itemCount === 0 ? 0 : itemSum / itemCount;
+  const score = totalWeight === 0 ? 0 : itemSum / totalWeight;
   return { score, contributions, unavailableSignals };
 }
 
