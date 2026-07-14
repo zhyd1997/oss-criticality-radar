@@ -48,13 +48,13 @@ Open [http://localhost:3000](http://localhost:3000).
 POST /api/score
 Content-Type: application/json
 
-{ "url": "https://github.com/kubernetes/kubernetes" }
+{ "url": "https://github.com/softmaple/softmaple" }
 ```
 
 Or:
 
 ```http
-GET /api/score?url=https://github.com/kubernetes/kubernetes
+GET /api/score?url=https://github.com/softmaple/softmaple
 ```
 
 Example response fields: `score`, `partial`, `unavailableSignals`, `repo`, `signals`, `contributions`.

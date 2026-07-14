@@ -1,3 +1,4 @@
+import { GitHubLink } from "./components/GitHubLink";
 import { ScoreForm } from "./components/ScoreForm";
 import { ThemeToggle } from "./components/ThemeToggle";
 
@@ -15,7 +16,10 @@ export default function Home() {
               critical, 1 = most critical).
             </p>
           </div>
-          <ThemeToggle />
+          <div className="flex shrink-0 items-center gap-2">
+            <GitHubLink />
+            <ThemeToggle />
+          </div>
         </div>
       </header>
 
