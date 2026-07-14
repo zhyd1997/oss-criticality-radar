@@ -1,0 +1,20 @@
+services:
+  score-service:
+    build: .
+    ports:
+      - "8080:8080"
+    # Optional env files (Compose v2.24+ required:false). Parent .env.local is
+    # the Next.js monorepo convention; score-service/.env is local override.
+    env_file:
+      - path: ../.env.local
+        required: false
+      - path: .env
+        required: false
+    environment:
+      PORT: "8080"
+      # Shared secret for POST /score (Bearer token). Leave empty only for local dev.
+      SCORE_SERVICE_TOKEN: ${SCORE_SERVICE_TOKEN:-}
+      # OpenSSF Criticality Score / Scorecard GitHub auth (from env file or shell).
+      GITHUB_AUTH_TOKEN: ${GITHUB_AUTH_TOKEN:-}
+      # Cap concurrent CLI processes (default 2 in server if unset).
+      SCORE_MAX_CONCURRENCY: ${SCORE_MAX_CONCURRENCY:-2}
