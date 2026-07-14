@@ -41,7 +41,10 @@ export type SignalContribution = {
   weighted: number | null;
   threshold: number;
   smallerIsBetter: boolean;
+  /** OpenSSF parameter description. */
   description: string;
+  /** OpenSSF parameter reasoning. */
+  reasoning: string;
   excluded: boolean;
 };
 

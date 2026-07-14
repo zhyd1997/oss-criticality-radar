@@ -23,16 +23,29 @@ type SignalConfig = {
   upper: number;
   lower?: number;
   smallerIsBetter?: boolean;
+  /** OpenSSF README "Description" column. */
   description: string;
+  /** OpenSSF README "Reasoning" column. */
+  reasoning: string;
 };
 
+/**
+ * Signal weights/thresholds from original_pike.yml.
+ * Description + reasoning from the OpenSSF criticality_score README parameter table:
+ * https://github.com/ossf/criticality_score#criticality-score
+ *
+ * Note: github_mention_count maps to OpenSSF's dependents_count when deps.dev is disabled
+ * (commit-message mention proxy).
+ */
 export const SIGNAL_CONFIG: SignalConfig[] = [
   {
     key: "created_since",
     label: "Created since",
     weight: 1,
     upper: 120,
-    description: "Months since the project was created",
+    description: "Time since the project was created (in months)",
+    reasoning:
+      "Older project has higher chance of being widely used or being dependent upon.",
   },
   {
     key: "updated_since",
@@ -40,63 +53,81 @@ export const SIGNAL_CONFIG: SignalConfig[] = [
     weight: 1,
     upper: 120,
     smallerIsBetter: true,
-    description: "Months since the last commit (lower is better)",
+    description: "Time since the project was last updated (in months)",
+    reasoning:
+      "Unmaintained projects with no recent commits have higher chance of being less relied upon.",
   },
   {
     key: "contributor_count",
     label: "Contributor count",
     weight: 2,
     upper: 5000,
-    description: "Count of project contributors with commits",
+    description: "Count of project contributors (with commits)",
+    reasoning:
+      "Different contributors involvement indicates project's importance.",
   },
   {
     key: "org_count",
     label: "Org count",
     weight: 1,
     upper: 10,
-    description: "Distinct organizations among top contributors",
+    description:
+      "Count of distinct organizations that contributors belong to",
+    reasoning: "Indicates cross-organization dependency.",
   },
   {
     key: "commit_frequency",
     label: "Commit frequency",
     weight: 1,
     upper: 1000,
-    description: "Average commits per week over the last year",
+    description: "Average number of commits per week in the last year",
+    reasoning:
+      "Higher code churn has slight indication of project's importance. Also, higher susceptibility to vulnerabilities.",
   },
   {
     key: "recent_release_count",
     label: "Recent release count",
     weight: 0.5,
     upper: 26,
-    description: "Releases in the last year",
+    description: "Number of releases in the last year",
+    reasoning:
+      "Frequent releases indicates user dependency. Lower weight since this is not always used.",
   },
   {
     key: "updated_issues_count",
     label: "Updated issues count",
     weight: 0.5,
     upper: 5000,
-    description: "Issues updated in the last 90 days",
+    description: "Number of issues updated in the last 90 days",
+    reasoning:
+      "Indicates high contributor involvement. Lower weight since it is dependent on project contributors.",
   },
   {
     key: "closed_issues_count",
     label: "Closed issues count",
     weight: 0.5,
     upper: 5000,
-    description: "Issues closed in the last 90 days",
+    description: "Number of issues closed in the last 90 days",
+    reasoning:
+      "Indicates high contributor involvement and focus on closing user issues. Lower weight since it is dependent on project contributors.",
   },
   {
     key: "issue_comment_frequency",
     label: "Issue comment frequency",
     weight: 1,
     upper: 15,
-    description: "Average comments per issue in the last 90 days",
+    description:
+      "Average number of comments per issue in the last 90 days",
+    reasoning: "Indicates high user activity and dependence.",
   },
   {
     key: "github_mention_count",
     label: "GitHub mention count",
     weight: 2,
     upper: 500000,
-    description: "Commit-message mentions of this repository",
+    description: "Number of project mentions in the commit messages",
+    reasoning:
+      "Indicates repository use, usually in version rolls. This parameter works across all languages, including C/C++ that don't have package dependency graphs (though hack-ish). Used as a dependents_count proxy when deps.dev is disabled.",
   },
 ];
 
@@ -153,6 +184,7 @@ export function scoreSignals(signals: CriticalitySignals): {
         threshold: cfg.upper,
         smallerIsBetter,
         description: cfg.description,
+        reasoning: cfg.reasoning,
         excluded: true,
       });
       continue;
@@ -174,6 +206,7 @@ export function scoreSignals(signals: CriticalitySignals): {
       threshold: cfg.upper,
       smallerIsBetter,
       description: cfg.description,
+      reasoning: cfg.reasoning,
       excluded: false,
     });
   }

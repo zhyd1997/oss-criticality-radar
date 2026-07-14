@@ -28,8 +28,17 @@ export function SignalBreakdown({ contributions, score }: Props) {
             Signal breakdown
           </h3>
           <p className="mt-0.5 text-xs text-zinc-500 dark:text-zinc-400">
-            Weighted arithmetic mean with zipfian normalization (Rob Pike /
-            OpenSSF)
+            Weighted arithmetic mean with zipfian normalization. Descriptions
+            and reasoning from the{" "}
+            <a
+              href="https://github.com/ossf/criticality_score#criticality-score"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="underline decoration-zinc-300 underline-offset-2 hover:text-emerald-700 dark:decoration-zinc-600 dark:hover:text-emerald-400"
+            >
+              OpenSSF criticality_score
+            </a>{" "}
+            parameter table.
           </p>
         </div>
 
@@ -40,7 +49,7 @@ export function SignalBreakdown({ contributions, score }: Props) {
         </div>
 
         <div className="hidden overflow-x-auto scroll-thin md:block">
-          <table className="w-full min-w-[520px] text-left text-sm">
+          <table className="w-full min-w-[640px] text-left text-sm">
             <thead>
               <tr className="border-b border-zinc-100 text-[11px] uppercase tracking-wide text-zinc-500 dark:border-zinc-800 dark:text-zinc-400">
                 <th className="px-5 py-3 font-medium">Signal</th>
@@ -62,6 +71,26 @@ export function SignalBreakdown({ contributions, score }: Props) {
   );
 }
 
+function SignalCopy({ contribution: c }: { contribution: SignalContribution }) {
+  return (
+    <>
+      <div className="font-medium text-zinc-800 dark:text-zinc-200">
+        {c.label}
+        <SignalMarks contribution={c} />
+      </div>
+      <p className="mt-0.5 text-xs leading-snug text-zinc-600 dark:text-zinc-400">
+        {c.description}
+      </p>
+      <p className="mt-1 text-xs leading-snug text-zinc-500 dark:text-zinc-500">
+        <span className="font-medium text-zinc-500 dark:text-zinc-400">
+          Why it matters:{" "}
+        </span>
+        {c.reasoning}
+      </p>
+    </>
+  );
+}
+
 function MobileSignalRow({
   contribution: c,
 }: {
@@ -71,13 +100,7 @@ function MobileSignalRow({
     <div className={`px-4 py-3.5 ${c.excluded ? "opacity-50" : ""}`}>
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="text-sm font-medium text-zinc-800 dark:text-zinc-200">
-            {c.label}
-            <SignalMarks contribution={c} className="ml-1" />
-          </p>
-          <p className="mt-0.5 text-xs text-zinc-500 dark:text-zinc-400">
-            {c.description}
-          </p>
+          <SignalCopy contribution={c} />
         </div>
         <div className="shrink-0 text-right">
           <p className="text-sm font-semibold tabular-nums text-zinc-800 dark:text-zinc-200">
@@ -107,14 +130,8 @@ function DesktopSignalRow({
         c.excluded ? "opacity-50" : ""
       }`}
     >
-      <td className="px-5 py-3.5">
-        <div className="font-medium text-zinc-800 dark:text-zinc-200">
-          {c.label}
-          <SignalMarks contribution={c} />
-        </div>
-        <div className="mt-0.5 max-w-xs text-xs leading-snug text-zinc-500 dark:text-zinc-400">
-          {c.description}
-        </div>
+      <td className="max-w-md px-5 py-3.5">
+        <SignalCopy contribution={c} />
       </td>
       <td className="px-3 py-3.5 text-right tabular-nums text-zinc-700 dark:text-zinc-300">
         {formatRaw(c.key, c.raw)}
