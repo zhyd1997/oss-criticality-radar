@@ -17,7 +17,7 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "OSS Criticality Radar",
   description:
-    "Compute the OpenSSF criticality score for any GitHub repository — paste a URL, get the score and signal breakdown.",
+    "Compute the OpenSSF criticality score for any GitHub repository — paste owner/repo or a URL, get the score and signal breakdown.",
 };
 
 export default function RootLayout({

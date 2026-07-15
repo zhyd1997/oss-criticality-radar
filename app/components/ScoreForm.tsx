@@ -29,7 +29,7 @@ export function ScoreForm() {
     if (!trimmed) {
       setState({
         status: "error",
-        message: "Please enter a GitHub repository URL",
+        message: "Please enter a GitHub repository (owner/repo or URL)",
       });
       return;
     }
@@ -84,7 +84,7 @@ export function ScoreForm() {
           htmlFor="repo-url"
           className="text-sm text-zinc-600 dark:text-zinc-400"
         >
-          GitHub repository URL
+          GitHub repository
         </label>
         <div className="flex flex-col gap-2 sm:flex-row">
           <input
@@ -92,7 +92,7 @@ export function ScoreForm() {
             type="text"
             value={url}
             onChange={(e) => setUrl(e.target.value)}
-            placeholder="https://github.com/owner/repo"
+            placeholder="owner/repo or https://github.com/owner/repo"
             disabled={loading}
             autoComplete="off"
             spellCheck={false}

@@ -11,7 +11,7 @@ export type ParsedRepo = {
 export function parseGitHubRepo(input: string): ParsedRepo {
   const raw = input.trim();
   if (!raw) {
-    throw new Error("Please enter a GitHub repository URL");
+    throw new Error("Please enter a GitHub repository (owner/repo or URL)");
   }
 
   // Shorthand: owner/repo
@@ -33,7 +33,9 @@ export function parseGitHubRepo(input: string): ParsedRepo {
       : `https://${raw}`;
     url = new URL(withProtocol);
   } catch {
-    throw new Error("Invalid repository URL. Expected format: https://github.com/owner/repo");
+    throw new Error(
+      "Invalid repository. Expected owner/repo or https://github.com/owner/repo",
+    );
   }
 
   const host = url.hostname.replace(/^www\./, "");
