@@ -1,6 +1,6 @@
 # OSS Criticality Radar
 
-Web UI for the [OpenSSF Criticality Score](https://github.com/ossf/criticality_score). Paste a GitHub repository URL to see its criticality score and signal breakdown — no need to run:
+Web UI for the [OpenSSF Criticality Score](https://github.com/ossf/criticality_score). Paste a GitHub repository (`owner/repo` or full URL) to see its criticality score and signal breakdown — no need to run:
 
 ```bash
 criticality_score -depsdev-disable https://github.com/owner/repo
@@ -10,7 +10,7 @@ Scores range from **0** (least critical) to **1** (most critical), using Rob Pik
 
 ## Features
 
-- Input any GitHub repo URL (or `owner/repo`)
+- Accepts `owner/repo`, `github.com/owner/repo`, or `https://github.com/owner/repo`
 - Scores via the official OpenSSF `criticality_score` CLI (**deps.dev disabled**)
 - Overall score plus per-signal breakdown
 
@@ -55,6 +55,15 @@ Open [http://localhost:3000](http://localhost:3000).
 
 ## API
 
+The `url` field accepts a full GitHub URL or `owner/repo` shorthand:
+
+```http
+POST /api/score
+Content-Type: application/json
+
+{ "url": "softmaple/softmaple" }
+```
+
 ```http
 POST /api/score
 Content-Type: application/json
@@ -63,6 +72,10 @@ Content-Type: application/json
 ```
 
 Or:
+
+```http
+GET /api/score?url=softmaple/softmaple
+```
 
 ```http
 GET /api/score?url=https://github.com/softmaple/softmaple
