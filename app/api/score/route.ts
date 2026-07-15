@@ -93,7 +93,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(
       {
         error: "Missing query parameter: url",
-        usage: "GET /api/score?url=https://github.com/owner/repo",
+        usage: "GET /api/score?url=owner/repo (or https://github.com/owner/repo)",
       },
       { status: 400 },
     );
