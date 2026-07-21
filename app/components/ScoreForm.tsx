@@ -12,7 +12,7 @@ import { ScoreResultView } from "./ScoreResult";
 const EXAMPLES = [
   "https://github.com/softmaple/softmaple",
   "https://github.com/vercel/next.js",
-  "https://github.com/ossf/criticality_score",
+  "https://github.com/storybookjs/storybook",
 ];
 
 /** Duration of `.panel-out` — keep loading mounted until it finishes. */
