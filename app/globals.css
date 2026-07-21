@@ -25,3 +25,42 @@ body {
   color: var(--foreground);
   font-family: var(--font-geist-sans), system-ui, sans-serif;
 }
+
+/* Panel enter/leave for score form status transitions */
+@keyframes panel-in {
+  from {
+    opacity: 0;
+    transform: translateY(0.5rem);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes panel-out {
+  from {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(-0.35rem);
+  }
+}
+
+.panel-in {
+  animation: panel-in 280ms ease-out both;
+}
+
+.panel-out {
+  animation: panel-out 180ms ease-in both;
+  pointer-events: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .panel-in,
+  .panel-out {
+    animation: none;
+  }
+}

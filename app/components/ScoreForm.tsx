@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
+import { parseGitHubRepo } from "@/lib/parse-repo";
 import {
   isScoreErrorBody,
   isScoreResult,
@@ -11,18 +12,73 @@ import { ScoreResultView } from "./ScoreResult";
 const EXAMPLES = [
   "https://github.com/softmaple/softmaple",
   "https://github.com/vercel/next.js",
-  "https://github.com/ossf/criticality_score",
+  "https://github.com/storybookjs/storybook",
 ];
+
+/** Duration of `.panel-out` — keep loading mounted until it finishes. */
+const PANEL_OUT_MS = 180;
 
 type FormState =
   | { status: "idle" }
-  | { status: "loading" }
+  | { status: "loading"; command: string; exiting?: boolean }
   | { status: "error"; message: string }
   | { status: "success"; result: ScoreResult };
+
+/** Build the CLI argv shown while score-service runs criticality_score. */
+function buildCliCommand(repoUrl: string): string {
+  let displayUrl = repoUrl.trim();
+  try {
+    displayUrl = parseGitHubRepo(displayUrl).url;
+  } catch {
+    // Keep the raw input if parsing fails; the API will validate.
+  }
+  return [
+    "criticality_score",
+    "-depsdev-disable",
+    "-format",
+    "json",
+    "-log",
+    "error",
+    displayUrl,
+  ].join(" ");
+}
+
+function prefersReducedMotion(): boolean {
+  if (typeof window === "undefined") return false;
+  return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+}
 
 export function ScoreForm() {
   const [url, setUrl] = useState("");
   const [state, setState] = useState<FormState>({ status: "idle" });
+  const requestIdRef = useRef(0);
+
+  // Clear pending leave timers if the component unmounts mid-transition.
+  useEffect(() => {
+    return () => {
+      requestIdRef.current += 1;
+    };
+  }, []);
+
+  /**
+   * Fade the loading panel out, then swap to the next state so enter/leave
+   * don't overlap. Skips the delay when the user prefers reduced motion.
+   */
+  async function transitionFromLoading(next: FormState) {
+    const leaveMs = prefersReducedMotion() ? 0 : PANEL_OUT_MS;
+    const requestId = requestIdRef.current;
+
+    if (leaveMs > 0) {
+      setState((prev) =>
+        prev.status === "loading" ? { ...prev, exiting: true } : prev,
+      );
+      await new Promise((resolve) => setTimeout(resolve, leaveMs));
+    }
+
+    // A newer request started while we were exiting — don't clobber it.
+    if (requestId !== requestIdRef.current) return;
+    setState(next);
+  }
 
   async function analyze(repoUrl: string) {
     const trimmed = repoUrl.trim();
@@ -34,7 +90,8 @@ export function ScoreForm() {
       return;
     }
 
-    setState({ status: "loading" });
+    const requestId = ++requestIdRef.current;
+    setState({ status: "loading", command: buildCliCommand(trimmed) });
 
     try {
       const res = await fetch("/api/score", {
@@ -43,27 +100,31 @@ export function ScoreForm() {
         body: JSON.stringify({ url: trimmed }),
       });
 
+      // Stale response after a newer analyze() call.
+      if (requestId !== requestIdRef.current) return;
+
       const data: unknown = await res.json();
 
       if (!res.ok) {
         const message = isScoreErrorBody(data)
           ? data.error
           : "Failed to compute score";
-        setState({ status: "error", message });
+        await transitionFromLoading({ status: "error", message });
         return;
       }
 
       if (!isScoreResult(data)) {
-        setState({
+        await transitionFromLoading({
           status: "error",
           message: "Unexpected response from score API",
         });
         return;
       }
 
-      setState({ status: "success", result: data });
+      await transitionFromLoading({ status: "success", result: data });
     } catch {
-      setState({
+      if (requestId !== requestIdRef.current) return;
+      await transitionFromLoading({
         status: "error",
         message: "Network error. Please try again.",
       });
@@ -96,14 +157,24 @@ export function ScoreForm() {
             disabled={loading}
             autoComplete="off"
             spellCheck={false}
-            className="min-w-0 flex-1 rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 outline-none focus:border-zinc-500 disabled:opacity-60 dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-50 dark:focus:border-zinc-500"
+            className="min-w-0 flex-1 rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 outline-none transition-opacity focus:border-zinc-500 disabled:opacity-60 dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-50 dark:focus:border-zinc-500"
           />
           <button
             type="submit"
             disabled={loading}
-            className="inline-flex shrink-0 items-center justify-center rounded-md border border-zinc-900 bg-zinc-900 px-4 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-60 dark:border-zinc-100 dark:bg-zinc-100 dark:text-zinc-900"
+            className="inline-flex shrink-0 items-center justify-center gap-2 rounded-md border border-zinc-900 bg-zinc-900 px-4 py-2 text-sm font-medium text-white transition-opacity disabled:cursor-not-allowed disabled:opacity-60 dark:border-zinc-100 dark:bg-zinc-100 dark:text-zinc-900"
           >
-            Get score
+            {loading ? (
+              <>
+                <span
+                  className="size-3.5 animate-spin rounded-full border-2 border-white/30 border-t-white dark:border-zinc-900/30 dark:border-t-zinc-900"
+                  aria-hidden
+                />
+                Running…
+              </>
+            ) : (
+              "Get score"
+            )}
           </button>
         </div>
 
@@ -118,7 +189,7 @@ export function ScoreForm() {
                 setUrl(example);
                 void analyze(example);
               }}
-              className="underline underline-offset-2 hover:text-zinc-800 disabled:opacity-50 dark:hover:text-zinc-200"
+              className="underline underline-offset-2 transition-opacity hover:text-zinc-800 disabled:opacity-50 dark:hover:text-zinc-200"
             >
               {example.replace("https://github.com/", "")}
             </button>
@@ -129,20 +200,59 @@ export function ScoreForm() {
       {state.status === "error" && (
         <p
           role="alert"
-          className="border-l-2 border-zinc-900 pl-3 text-sm font-medium text-zinc-900 dark:border-zinc-100 dark:text-zinc-50"
+          className="panel-in border-l-2 border-zinc-900 pl-3 text-sm font-medium text-zinc-900 dark:border-zinc-100 dark:text-zinc-50"
         >
           {state.message}
         </p>
       )}
 
       {loading && (
-        <p className="text-sm text-zinc-500">
-          Collecting signals via OpenSSF Criticality Score… this may take up
-          to a minute.
-        </p>
+        <div
+          role="status"
+          aria-live="polite"
+          className={`overflow-hidden rounded-lg border border-zinc-200 bg-zinc-950 text-zinc-100 dark:border-zinc-800 ${
+            state.exiting ? "panel-out" : "panel-in"
+          }`}
+        >
+          <div className="flex items-center gap-2 border-b border-zinc-800 px-3 py-2">
+            <span className="size-2.5 rounded-full bg-red-500/80" aria-hidden />
+            <span
+              className="size-2.5 rounded-full bg-amber-400/80"
+              aria-hidden
+            />
+            <span
+              className="size-2.5 rounded-full bg-emerald-500/80"
+              aria-hidden
+            />
+            <span className="ml-2 text-xs text-zinc-500">score-service</span>
+            <span className="ml-auto flex items-center gap-1.5 text-xs text-zinc-500">
+              <span
+                className="inline-block size-1.5 animate-pulse rounded-full bg-emerald-400"
+                aria-hidden
+              />
+              running
+            </span>
+          </div>
+          <pre className="overflow-x-auto p-4 font-mono text-xs leading-relaxed sm:text-sm">
+            <span className="select-none text-emerald-400">$ </span>
+            <span className="text-zinc-100">{state.command}</span>
+            <span
+              className="ml-0.5 inline-block h-4 w-2 animate-pulse bg-zinc-100 align-middle"
+              aria-hidden
+            />
+          </pre>
+          <p className="border-t border-zinc-800 px-4 py-2 text-xs text-zinc-500">
+            Collecting OpenSSF Criticality Score signals… this may take up to a
+            minute.
+          </p>
+        </div>
       )}
 
-      {state.status === "success" && <ScoreResultView result={state.result} />}
+      {state.status === "success" && (
+        <div className="panel-in">
+          <ScoreResultView result={state.result} />
+        </div>
+      )}
     </div>
   );
 }
