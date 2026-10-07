@@ -39,9 +39,10 @@ Create a [GitHub personal access token](https://docs.github.com/en/authenticatio
 ### 3. Start the score service backend
 
 ```bash
-cd services
-docker compose up --build
+pnpm services:up      # docker compose -f services/docker-compose.yml up --build
 ```
+
+Stop it with `pnpm services:down`.
 
 Compose loads the repo-root `.env.local` for `GITHUB_AUTH_TOKEN` and `SCORE_SERVICE_TOKEN` (plus an optional `services/score/.env`).
 
