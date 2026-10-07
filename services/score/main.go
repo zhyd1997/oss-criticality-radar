@@ -23,6 +23,8 @@ import (
 const (
 	defaultPort           = "8080"
 	defaultMaxConcurrency = 2
+	// gracePeriod is the extra time beyond cli.Timeout allowed to write responses.
+	gracePeriod = 10 * time.Second
 )
 
 func main() {
@@ -59,7 +61,7 @@ func main() {
 		ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout:       10 * time.Second,
 		// WriteTimeout must exceed cli.Timeout so long CLI runs can finish.
-		WriteTimeout: cli.Timeout + 10*time.Second,
+		WriteTimeout: cli.Timeout + gracePeriod,
 		IdleTimeout:  60 * time.Second,
 	}
 
@@ -77,7 +79,8 @@ func main() {
 	<-ctx.Done()
 	log.Printf("shutdown signal received")
 
-	shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	// Shutdown waits for in-flight POST /score requests, which may run up to cli.Timeout.
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), cli.Timeout+gracePeriod)
 	defer cancel()
 	if err := srv.Shutdown(shutdownCtx); err != nil {
 		log.Printf("graceful shutdown failed: %v", err)
