@@ -1,6 +1,8 @@
+name: oss-criticality-radar
+
 services:
-  score-service:
-    build: .
+  score:
+    build: ./score
     # Bind to loopback only so an unauthenticated local process is not LAN-exposed.
     # Production/non-local deploys should set SCORE_SERVICE_TOKEN (via env_file).
     ports:
@@ -11,7 +13,7 @@ services:
     env_file:
       - path: ../.env.local
         required: false
-      - path: .env
+      - path: ./score/.env
         required: false
     environment:
       PORT: "8080"
