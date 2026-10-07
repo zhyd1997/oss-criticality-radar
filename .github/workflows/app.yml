@@ -23,6 +23,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
       # Version comes from `packageManager` in package.json.
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v5
