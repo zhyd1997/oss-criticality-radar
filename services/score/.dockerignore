@@ -1,5 +1,6 @@
 # Keep the build context to Go sources only.
-.env*
-*_test.go
+# `**/` matches at any depth; a bare pattern only matches the context root.
+**/.env*
+**/*_test.go
 Dockerfile
 .dockerignore
