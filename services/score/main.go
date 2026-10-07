@@ -11,6 +11,7 @@ import (
 	"os"
 	"os/exec"
 	"os/signal"
+	"strconv"
 	"strings"
 	"syscall"
 	"time"
@@ -91,16 +92,9 @@ func envOr(key, fallback string) string {
 }
 
 func envIntOr(key string, fallback int) int {
-	v := strings.TrimSpace(os.Getenv(key))
-	if v == "" {
+	n, err := strconv.Atoi(strings.TrimSpace(os.Getenv(key)))
+	if err != nil {
 		return fallback
-	}
-	n := 0
-	for _, c := range v {
-		if c < '0' || c > '9' {
-			return fallback
-		}
-		n = n*10 + int(c-'0')
 	}
 	return n
 }
