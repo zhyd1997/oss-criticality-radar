@@ -93,8 +93,11 @@ Example fields: `score`, `partial`, `unavailableSignals`, `repo`, `signals`, `co
 ## Tests
 
 ```bash
-pnpm test
+pnpm test                               # Next.js / lib
+(cd services/score && go test ./...)    # score service
 ```
+
+CI runs these on pull requests (`.github/workflows/`): lint, test and build for the app; gofmt, vet, test and a Docker build for `services/score`, each only when its paths change.
 
 ## How scoring works
 

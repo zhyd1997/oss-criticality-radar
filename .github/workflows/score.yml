@@ -1,0 +1,44 @@
+name: score
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "services/score/**"
+      - ".github/workflows/score.yml"
+  pull_request:
+    paths:
+      - "services/score/**"
+      - ".github/workflows/score.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    working-directory: services/score
+
+jobs:
+  go:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: services/score/go.mod
+          # Stdlib-only module: no go.sum to key a cache on.
+          cache: false
+      - name: gofmt
+        run: test -z "$(gofmt -l .)" || { gofmt -l .; exit 1; }
+      - run: go vet ./...
+      - run: go test ./...
+
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - run: docker build -t score:ci .
