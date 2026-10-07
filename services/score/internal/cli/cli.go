@@ -4,6 +4,7 @@ package cli
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net/http"
 	"os/exec"
 	"strings"
@@ -66,7 +67,8 @@ func Run(ctx context.Context, repoURL string) (Result, int) {
 
 	if errors.Is(ctx.Err(), context.DeadlineExceeded) {
 		resp.Code = -1
-		resp.Stderr = appendLine(resp.Stderr, "error: command timed out after 90s")
+		resp.Stderr = appendLine(resp.Stderr,
+			fmt.Sprintf("error: command timed out after %ds", int(Timeout/time.Second)))
 		return resp, http.StatusGatewayTimeout
 	}
 

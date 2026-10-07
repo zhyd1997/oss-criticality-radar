@@ -58,7 +58,7 @@ func main() {
 		ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout:       10 * time.Second,
 		// WriteTimeout must exceed cli.Timeout so long CLI runs can finish.
-		WriteTimeout: 100 * time.Second,
+		WriteTimeout: cli.Timeout + 10*time.Second,
 		IdleTimeout:  60 * time.Second,
 	}
 
