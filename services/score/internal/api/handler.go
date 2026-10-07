@@ -8,6 +8,7 @@ import (
 	"crypto/subtle"
 	"encoding/json"
 	"errors"
+	"io"
 	"log"
 	"net/http"
 	"strings"
@@ -91,6 +92,10 @@ func parseScoreRequest(r *http.Request) (string, error) {
 	dec := json.NewDecoder(r.Body)
 	dec.DisallowUnknownFields()
 	if err := dec.Decode(&req); err != nil {
+		return "", errors.New("invalid JSON body")
+	}
+	// Exactly one JSON object: reject trailing values such as a second object.
+	if err := dec.Decode(&struct{}{}); !errors.Is(err, io.EOF) {
 		return "", errors.New("invalid JSON body")
 	}
 

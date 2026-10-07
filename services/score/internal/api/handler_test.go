@@ -147,6 +147,13 @@ func TestScoreHandler_Validation(t *testing.T) {
 			t.Fatalf("status=%d body=%s", rr.Code, rr.Body.String())
 		}
 	})
+
+	t.Run("trailing json value", func(t *testing.T) {
+		rr := postScore(t, h, `{"repoUrl":"https://github.com/o/r"}{"repoUrl":"https://github.com/x/y"}`, "")
+		if rr.Code != http.StatusBadRequest {
+			t.Fatalf("status=%d body=%s", rr.Code, rr.Body.String())
+		}
+	})
 }
 
 func TestScoreHandler_Auth(t *testing.T) {
