@@ -27,10 +27,11 @@ WORKDIR /src
 COPY go.mod ./
 RUN go mod download
 
-COPY server.go ./
+# Copy all Go sources; .dockerignore keeps tests and secrets out of the context.
+COPY . ./
 
 RUN CGO_ENABLED=0 GOOS=linux GOARCH=${TARGETARCH} \
-    go build -trimpath -ldflags="-s -w" -o /out/server server.go
+    go build -trimpath -ldflags="-s -w" -o /out/server .
 
 # -----------------------------------------------------------------------------
 # Stage 3: minimal runtime image

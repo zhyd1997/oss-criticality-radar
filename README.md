@@ -39,11 +39,12 @@ Create a [GitHub personal access token](https://docs.github.com/en/authenticatio
 ### 3. Start the score service backend
 
 ```bash
-cd services
-docker compose up --build
+pnpm services:up      # docker compose -f services/docker-compose.yml up --build
 ```
 
-Compose loads the repo-root `.env.local` for `GITHUB_AUTH_TOKEN` and `SCORE_SERVICE_TOKEN` (plus an optional `services/score/.env`).
+Stop it with `pnpm services:down`.
+
+Compose loads the repo-root `.env.local` for `GITHUB_AUTH_TOKEN`, `SCORE_SERVICE_TOKEN` and `SCORE_MAX_CONCURRENCY` (plus an optional `services/score/.env`).
 
 ### 4. Run the Next.js dev server
 
@@ -92,8 +93,11 @@ Example fields: `score`, `partial`, `unavailableSignals`, `repo`, `signals`, `co
 ## Tests
 
 ```bash
-pnpm test
+pnpm test                               # Next.js / lib
+(cd services/score && go test ./...)    # score service
 ```
+
+CI runs these on pull requests (`.github/workflows/`): lint, test and build for the app; gofmt, vet, test and a Docker build for `services/score`, each only when its paths change.
 
 ## How scoring works
 
@@ -118,7 +122,7 @@ Scoring is performed by OpenSSF’s CLI inside Docker. The frontend maps CLI out
 
 ```
 app/                  Next.js App Router (UI + /api/score BFF)
-lib/                  Shared TypeScript (score-service client, parsing, rate limit)
+lib/                  Shared TypeScript (score service client, parsing, rate limit)
 services/
   docker-compose.yml  Local orchestration for backend services
   score/              Go HTTP wrapper around the criticality_score CLI (Dockerfile, go.mod)

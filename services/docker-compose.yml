@@ -8,8 +8,9 @@ services:
     ports:
       - "127.0.0.1:8080:8080"
     # Inject secrets/config into the container from optional files.
-    # Do NOT re-list GITHUB_AUTH_TOKEN / SCORE_SERVICE_TOKEN under `environment`
-    # with ${VAR:-}: empty host interpolation overrides env_file with blanks.
+    # Do NOT re-list GITHUB_AUTH_TOKEN / SCORE_SERVICE_TOKEN / SCORE_MAX_CONCURRENCY
+    # under `environment`: it overrides env_file, so ${VAR:-...} interpolation
+    # would replace the .env.local value with a blank or a default.
     env_file:
       - path: ../.env.local
         required: false
@@ -17,5 +18,3 @@ services:
         required: false
     environment:
       PORT: "8080"
-      # Only non-secret defaults here. Tokens come from env_file (or a real host export).
-      SCORE_MAX_CONCURRENCY: ${SCORE_MAX_CONCURRENCY:-2}

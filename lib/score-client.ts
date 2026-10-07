@@ -31,7 +31,7 @@ function serviceBaseUrl(): string {
   const url = process.env.SCORE_SERVICE_URL?.trim();
   if (!url) {
     throw new ScoreServiceError(
-      "SCORE_SERVICE_URL is required. Start score-service and set SCORE_SERVICE_URL (e.g. http://localhost:8080).",
+      "SCORE_SERVICE_URL is required. Start the score service and set SCORE_SERVICE_URL (e.g. http://localhost:8080).",
       { status: 500, code: "score_service_unconfigured" },
     );
   }
@@ -44,7 +44,7 @@ function serviceToken(): string | undefined {
 }
 
 /**
- * Call score-service POST /score and map CLI JSON stdout into ScoreResult.
+ * Call the score service POST /score and map CLI JSON stdout into ScoreResult.
  * Token is server-side only (never NEXT_PUBLIC_*).
  */
 export async function scoreViaService(repoUrl: string): Promise<ScoreResult> {
@@ -70,7 +70,7 @@ export async function scoreViaService(repoUrl: string): Promise<ScoreResult> {
     });
   } catch (err) {
     const message =
-      err instanceof Error ? err.message : "Failed to reach score-service";
+      err instanceof Error ? err.message : "Failed to reach the score service";
     throw new ScoreServiceError(message, {
       status: 502,
       code: "score_service_unreachable",
@@ -81,7 +81,7 @@ export async function scoreViaService(repoUrl: string): Promise<ScoreResult> {
   try {
     body = await res.json();
   } catch {
-    throw new ScoreServiceError("score-service returned non-JSON", {
+    throw new ScoreServiceError("Score service returned non-JSON", {
       status: 502,
       code: "score_service_bad_response",
     });
@@ -94,7 +94,7 @@ export async function scoreViaService(repoUrl: string): Promise<ScoreResult> {
       "error" in body &&
       typeof (body as { error: unknown }).error === "string"
         ? (body as { error: string }).error
-        : `score-service HTTP ${res.status}`;
+        : `Score service HTTP ${res.status}`;
     throw new ScoreServiceError(errMsg, {
       status: res.status >= 400 && res.status < 600 ? res.status : 502,
       code: "score_service_http_error",
@@ -113,7 +113,7 @@ export async function scoreViaService(repoUrl: string): Promise<ScoreResult> {
     body === null ||
     typeof (body as ScoreServiceRawResponse).code !== "number"
   ) {
-    throw new ScoreServiceError("score-service response missing code", {
+    throw new ScoreServiceError("Score service response missing code", {
       status: 502,
       code: "score_service_bad_response",
     });
