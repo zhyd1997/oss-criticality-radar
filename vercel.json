@@ -3,7 +3,15 @@
   "services": {
     "app": {
       "root": ".",
-      "framework": "nextjs"
+      "framework": "nextjs",
+      "bindings": [
+        {
+          "type": "service",
+          "service": "score-service",
+          "format": "url",
+          "env": "SCORE_SERVICE_URL"
+        }
+      ]
     },
     "score-service": {
       "root": "score-service",
