@@ -77,6 +77,26 @@ func TestCanonicalizeGitHubRepoURL(t *testing.T) {
 			in:      "https://user:pass@github.com/o/r",
 			wantErr: true,
 		},
+		{
+			name:    "escaped fragment rejected",
+			in:      "https://github.com/o/r%23other",
+			wantErr: true,
+		},
+		{
+			name:    "escaped query rejected",
+			in:      "https://github.com/o/r%3Fx=1",
+			wantErr: true,
+		},
+		{
+			name:    "escaped slash rejected",
+			in:      "https://github.com/o%2Fx/r",
+			wantErr: true,
+		},
+		{
+			name: "dots, dashes and underscores allowed",
+			in:   "https://github.com/my-org/repo_name.js",
+			want: "https://github.com/my-org/repo_name.js",
+		},
 	}
 
 	for _, tt := range tests {

@@ -3,8 +3,13 @@ package api
 import (
 	"errors"
 	"net/url"
+	"regexp"
 	"strings"
 )
+
+// repoNamePattern matches GitHub owner and repository names
+// (same character set as the BFF shorthand parser in lib/parse-repo.ts).
+var repoNamePattern = regexp.MustCompile(`^[A-Za-z0-9_.-]+$`)
 
 // canonicalizeGitHubRepoURL accepts only https://github.com/owner/repo and
 // returns a normalized form without userinfo, query, fragment, or extra path.
@@ -38,9 +43,11 @@ func canonicalizeGitHubRepoURL(raw string) (string, error) {
 	if len(parts) != 2 || parts[0] == "" || parts[1] == "" {
 		return "", errors.New(errMsg)
 	}
-	// Keep owner/repo conservative: no nested paths (e.g. tree/main).
+	// Keep owner/repo conservative: no nested paths (e.g. tree/main), and only
+	// GitHub name characters. u.Path is decoded, so this also rejects escaped
+	// delimiters such as %23 ('#') or %3F ('?') that would change the URL.
 	owner, repo := parts[0], parts[1]
-	if strings.ContainsAny(owner, " \t") || strings.ContainsAny(repo, " \t") {
+	if !repoNamePattern.MatchString(owner) || !repoNamePattern.MatchString(repo) {
 		return "", errors.New(errMsg)
 	}
 
