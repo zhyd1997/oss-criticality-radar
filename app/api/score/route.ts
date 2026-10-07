@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { checkRateLimit } from "@/lib/rate-limit";
-import { ScoreServiceError } from "@/lib/score-service-client";
+import { ScoreServiceError } from "@/lib/score-client";
 import { scoreRepoUrl } from "@/lib/score";
 
-// Allow waiting on score-service (CLI timeout is 90s).
+// Allow waiting on the score service (CLI timeout is 90s).
 export const maxDuration = 120;
 
 function clientKey(request: NextRequest): string {

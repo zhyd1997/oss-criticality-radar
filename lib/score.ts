@@ -1,10 +1,10 @@
 import { parseGitHubRepo } from "./parse-repo";
 import { getCachedScore, setCachedScore } from "./rate-limit";
-import { scoreViaService } from "./score-service-client";
+import { scoreViaService } from "./score-client";
 import type { ScoreResult } from "./types";
 
 /**
- * Parse a GitHub repo URL and compute the criticality score via score-service
+ * Parse a GitHub repo URL and compute the criticality score via the score service
  * (OpenSSF criticality_score CLI). Shared by GET and POST /api/score.
  */
 export async function scoreRepoUrl(url: string): Promise<ScoreResult> {

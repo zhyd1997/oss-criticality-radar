@@ -118,7 +118,7 @@ Scoring is performed by OpenSSF’s CLI inside Docker. The frontend maps CLI out
 
 ```
 app/                  Next.js App Router (UI + /api/score BFF)
-lib/                  Shared TypeScript (score-service client, parsing, rate limit)
+lib/                  Shared TypeScript (score service client, parsing, rate limit)
 services/
   docker-compose.yml  Local orchestration for backend services
   score/              Go HTTP wrapper around the criticality_score CLI (Dockerfile, go.mod)

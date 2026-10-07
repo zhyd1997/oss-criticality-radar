@@ -24,7 +24,7 @@ type FormState =
   | { status: "error"; message: string }
   | { status: "success"; result: ScoreResult };
 
-/** Build the CLI argv shown while score-service runs criticality_score. */
+/** Build the CLI argv shown while the score service runs criticality_score. */
 function buildCliCommand(repoUrl: string): string {
   let displayUrl = repoUrl.trim();
   try {
@@ -224,7 +224,7 @@ export function ScoreForm() {
               className="size-2.5 rounded-full bg-emerald-500/80"
               aria-hidden
             />
-            <span className="ml-2 text-xs text-zinc-500">score-service</span>
+            <span className="ml-2 text-xs text-zinc-500">services/score</span>
             <span className="ml-auto flex items-center gap-1.5 text-xs text-zinc-500">
               <span
                 className="inline-block size-1.5 animate-pulse rounded-full bg-emerald-400"
