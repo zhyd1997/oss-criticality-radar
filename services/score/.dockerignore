@@ -1,0 +1,5 @@
+# Keep the build context to Go sources only.
+.env*
+*_test.go
+Dockerfile
+.dockerignore
