@@ -44,7 +44,7 @@ pnpm services:up      # docker compose -f services/docker-compose.yml up --build
 
 Stop it with `pnpm services:down`.
 
-Compose loads the repo-root `.env.local` for `GITHUB_AUTH_TOKEN` and `SCORE_SERVICE_TOKEN` (plus an optional `services/score/.env`).
+Compose loads the repo-root `.env.local` for `GITHUB_AUTH_TOKEN`, `SCORE_SERVICE_TOKEN` and `SCORE_MAX_CONCURRENCY` (plus an optional `services/score/.env`).
 
 ### 4. Run the Next.js dev server
 
