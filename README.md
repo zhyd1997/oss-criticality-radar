@@ -27,23 +27,23 @@ pnpm install
 ```bash
 cp .env.example .env.local
 # Edit .env.local:
-#   GITHUB_AUTH_TOKEN=...          # used by score-service / CLI
+#   GITHUB_AUTH_TOKEN=...          # used by the score service / CLI
 #   SCORE_SERVICE_URL=http://localhost:8080
 #   SCORE_SERVICE_TOKEN=dev-shared-secret
 ```
 
 Create a [GitHub personal access token](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/creating-a-personal-access-token) with read access to public repositories. Without it, the CLI hits strict rate limits.
 
-`SCORE_SERVICE_URL` is **required** for the Next.js app. `SCORE_SERVICE_TOKEN` must match the token configured for score-service (Bearer auth on `POST /score`).
+`SCORE_SERVICE_URL` is **required** for the Next.js app. `SCORE_SERVICE_TOKEN` must match the token configured for the score service (Bearer auth on `POST /score`).
 
-### 3. Start the score-service backend
+### 3. Start the score service backend
 
 ```bash
-cd score-service
+cd services
 docker compose up --build
 ```
 
-Compose loads `../.env.local` for `GITHUB_AUTH_TOKEN` and `SCORE_SERVICE_TOKEN`.
+Compose loads the repo-root `.env.local` for `GITHUB_AUTH_TOKEN` and `SCORE_SERVICE_TOKEN` (plus an optional `services/score/.env`).
 
 ### 4. Run the Next.js dev server
 
@@ -81,7 +81,7 @@ GET /api/score?url=softmaple/softmaple
 GET /api/score?url=https://github.com/softmaple/softmaple
 ```
 
-The BFF proxies to score-service, parses CLI JSON, and returns the UI shape:
+The BFF proxies to the score service, parses CLI JSON, and returns the UI shape:
 
 Example fields: `score`, `partial`, `unavailableSignals`, `repo`, `signals`, `contributions`.
 
@@ -113,6 +113,17 @@ Scoring is performed by OpenSSF’s CLI inside Docker. The frontend maps CLI out
 | github_mention_count | 2 | 500000 | commit search for `owner/repo` |
 
 **Note:** deps.dev dependent counts are not used (same as `-depsdev-disable`).
+
+## Project layout
+
+```
+app/                  Next.js App Router (UI + /api/score BFF)
+lib/                  Shared TypeScript (score-service client, parsing, rate limit)
+services/
+  docker-compose.yml  Local orchestration for backend services
+  score/              Go HTTP wrapper around the criticality_score CLI (Dockerfile, go.mod)
+vercel.json           Deploys `app` (Next.js) and `score` (container) as Vercel services
+```
 
 ## Stack
 

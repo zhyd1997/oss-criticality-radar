@@ -7,14 +7,14 @@
       "bindings": [
         {
           "type": "service",
-          "service": "score-service",
+          "service": "score",
           "format": "url",
           "env": "SCORE_SERVICE_URL"
         }
       ]
     },
-    "score-service": {
-      "root": "score-service",
+    "score": {
+      "root": "services/score",
       "runtime": "container"
     }
   },
